@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clinixvault-db
+  namespace: clinixvault
+  labels:
+    app: clinixvault-db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: clinixvault-db
+  template:
+    metadata:
+      labels:
+        app: clinixvault-db
+    spec:
+      containers:
+        - name: db
+          image: pgvector/pgvector:pg16
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: "clinixvault"
+            - name: POSTGRES_USER
+              value: "postgres"
+            - name: POSTGRES_PASSWORD
+              value: "postgres"
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "2000m"
+              memory: "4Gi"

@@ -1,0 +1,80 @@
+# ==============================================================================
+# Multi-Stage Dockerfile for ClinixVault API Gateway
+# Stage 1: Build virtual environment and compile C++ native inference accelerator
+# Stage 2: Hardened, non-root minimal runtime image with healthcheck probe
+# ==============================================================================
+
+# ----------------- Stage 1: Build & Compilation Stage -----------------
+FROM python:3.11-slim AS builder
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create dedicated virtual environment for isolated artifact transfer
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+COPY pyproject.toml /app/
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir \
+    fastapi>=0.110.0 \
+    uvicorn>=0.28.0 \
+    pydantic>=2.6.0 \
+    sqlalchemy>=2.0.28 \
+    psycopg2-binary>=2.9.9 \
+    httpx>=0.27.0 \
+    psutil>=5.9.8 \
+    numpy>=1.26.0 \
+    pydicom>=2.4.4 \
+    python-jose[cryptography]>=3.3.0 \
+    passlib>=1.7.4 \
+    bcrypt>=4.1.2 \
+    websockets>=12.0
+
+# Compile native C++ inference acceleration kernel
+COPY inference/cpp /app/inference/cpp
+RUN cd /app/inference/cpp && make clean && make
+
+# ----------------- Stage 2: Production Runtime Stage -----------------
+FROM python:3.11-slim AS runner
+
+WORKDIR /app
+
+# Install minimal runtime dependencies (libpq5 for PostgreSQL and curl for probes)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create unprivileged system user for HIPAA compliance and CIS container benchmark
+RUN groupadd -g 10001 clinix && \
+    useradd -u 10001 -g clinix -s /bin/bash -m appuser
+
+# Copy virtual environment and pre-compiled native kernels from builder
+COPY --from=builder /opt/venv /opt/venv
+COPY --from=builder /app/inference/cpp /app/inference/cpp
+
+ENV PATH="/opt/venv/bin:$PATH"
+ENV PYTHONPATH=/app
+
+# Copy application source code
+COPY backend /app/backend
+COPY inference/shared /app/inference/shared
+
+# Ensure appropriate permissions for non-root execution
+RUN chown -R appuser:clinix /app
+
+USER appuser
+
+EXPOSE 8000
+
+# Container liveness & readiness healthcheck probe
+HEALTHCHECK --interval=20s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8000/api/v1/health || exit 1
+
+CMD ["uvicorn", "backend.gateway.main:app", "--host", "0.0.0.0", "--port", "8000"]

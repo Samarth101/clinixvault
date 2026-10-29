@@ -1,0 +1,223 @@
+# ==============================================================================
+# ClinixVault Production Multi-Container Orchestration
+# Edge Clinical Intelligence Platform + Complete Microservices Observability
+# ==============================================================================
+
+services:
+  db:
+    build:
+      context: .
+      dockerfile: deployment/dockerfiles/Dockerfile.db
+    container_name: clinixvault_db
+    environment:
+      POSTGRES_DB: clinixvault
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d clinixvault"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - clinixvault_net
+
+  neo4j:
+    image: neo4j:5-community
+    container_name: clinixvault_neo4j
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      - NEO4J_AUTH=neo4j/clinixvault2026
+      - NEO4J_PLUGINS=["apoc"]
+      - NEO4J_dbms_memory_pagecache_size=512M
+      - NEO4J_dbms_memory_heap_initial__size=512M
+      - NEO4J_dbms_memory_heap_max__size=1G
+    volumes:
+      - neo4j_data:/data
+    restart: unless-stopped
+    networks:
+      - clinixvault_net
+
+  vlm-server:
+    build:
+      context: .
+      dockerfile: deployment/dockerfiles/Dockerfile.vlm
+    container_name: clinixvault_vlm
+    ports:
+      - "8001:8001"
+    environment:
+      - VLM_PORT=8001
+      - VLM_MODEL_PATH=clinixvault-qwen2vl-qlora
+    volumes:
+      - ./models:/app/models
+      - ./checkpoints:/app/checkpoints
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8001/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - clinixvault_net
+
+  llm-server:
+    build:
+      context: .
+      dockerfile: deployment/dockerfiles/Dockerfile.llm
+    container_name: clinixvault_llm
+    ports:
+      - "8002:8002"
+    environment:
+      - LLM_PORT=8002
+      - LLM_MODEL_PATH=/app/models/mistral-7b-instruct-v0.2.Q4_K_M.gguf
+    volumes:
+      - ./models:/app/models
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8002/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - clinixvault_net
+
+  audio-server:
+    build:
+      context: .
+      dockerfile: deployment/dockerfiles/Dockerfile.audio
+    container_name: clinixvault_audio
+    ports:
+      - "8003:8003"
+    environment:
+      - AUDIO_PORT=8003
+      - WHISPER_MODEL_SIZE=large-v3-turbo
+    volumes:
+      - ./models:/app/models
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8003/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - clinixvault_net
+
+  document-server:
+    build:
+      context: .
+      dockerfile: deployment/dockerfiles/Dockerfile.document
+    container_name: clinixvault_document
+    ports:
+      - "8004:8004"
+    environment:
+      - DOCUMENT_PORT=8004
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8004/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - clinixvault_net
+
+  gateway:
+    build:
+      context: .
+      dockerfile: deployment/dockerfiles/Dockerfile.gateway
+    container_name: clinixvault_gateway
+    ports:
+      - "8000:8000"
+    environment:
+      - GATEWAY_PORT=8000
+      - DATABASE_URL=postgresql+psycopg2://postgres:postgres@db:5432/clinixvault
+      - VLM_URL=http://vlm-server:8001
+      - LLM_URL=http://llm-server:8002
+      - AUDIO_URL=http://audio-server:8003
+      - DOCUMENT_URL=http://document-server:8004
+      - JWT_SECRET_KEY=clinixvault-production-air-gapped-secret-key-32bytes
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=clinixvault2026
+    depends_on:
+      db:
+        condition: service_healthy
+      vlm-server:
+        condition: service_healthy
+      llm-server:
+        condition: service_healthy
+      audio-server:
+        condition: service_healthy
+      document-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/v1/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - clinixvault_net
+
+  frontend:
+    build:
+      context: .
+      dockerfile: deployment/dockerfiles/Dockerfile.frontend
+    container_name: clinixvault_frontend
+    ports:
+      - "5173:5173"
+    depends_on:
+      gateway:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5173/healthz || exit 1"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - clinixvault_net
+
+  alloy:
+    build:
+      context: .
+      dockerfile: deployment/dockerfiles/Dockerfile.alloy
+    image: clinixvault-alloy:latest
+    container_name: clinixvault_alloy
+    restart: unless-stopped
+    ports:
+      - "12345:12345"
+    environment:
+      - GRAFANA_CLOUD_PROMETHEUS_URL=${GRAFANA_CLOUD_PROMETHEUS_URL}
+      - GRAFANA_CLOUD_PROMETHEUS_USER=${GRAFANA_CLOUD_PROMETHEUS_USER}
+      - GRAFANA_CLOUD_LOKI_URL=${GRAFANA_CLOUD_LOKI_URL}
+      - GRAFANA_CLOUD_LOKI_USER=${GRAFANA_CLOUD_LOKI_USER}
+      - GRAFANA_CLOUD_API_TOKEN=${GRAFANA_CLOUD_API_TOKEN}
+      - GATEWAY_METRICS_TARGET=gateway:8000
+      - VLM_METRICS_TARGET=vlm-server:8001
+      - LLM_METRICS_TARGET=llm-server:8002
+      - AUDIO_METRICS_TARGET=audio-server:8003
+      - DOCUMENT_METRICS_TARGET=document-server:8004
+    volumes:
+      - ./observability/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - ./logs:/var/log/clinixvault:ro
+      - ./logs:/Users/samarthbhandegaonkar/Desktop/clinixvault/logs:ro
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - /etc/alloy/config.alloy
+    networks:
+      - clinixvault_net
+
+volumes:
+  postgres_data:
+  neo4j_data:
+
+networks:
+  clinixvault_net:
+    driver: bridge

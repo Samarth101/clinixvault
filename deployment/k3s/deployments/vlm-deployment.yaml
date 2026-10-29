@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clinixvault-vlm
+  namespace: clinixvault
+  labels:
+    app: clinixvault-vlm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: clinixvault-vlm
+  template:
+    metadata:
+      labels:
+        app: clinixvault-vlm
+    spec:
+      containers:
+        - name: vlm
+          image: clinixvault/vlm:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8001
+          env:
+            - name: VLM_PORT
+              value: "8001"
+            - name: VLM_MODEL_PATH
+              value: "clinixvault-qwen2vl-qlora"
+          resources:
+            requests:
+              cpu: "1000m"
+              memory: "2Gi"
+            limits:
+              cpu: "4000m"
+              memory: "8Gi"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8001
+            initialDelaySeconds: 15
+            periodSeconds: 15

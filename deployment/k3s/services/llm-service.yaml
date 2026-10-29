@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: clinixvault-llm
+  namespace: clinixvault
+spec:
+  type: ClusterIP
+  selector:
+    app: clinixvault-llm
+  ports:
+    - name: http
+      port: 8002
+      targetPort: 8002

@@ -1,0 +1,64 @@
+# ==============================================================================
+# Multi-Stage Dockerfile for ClinixVault Ambient Audio Scribing Server
+# Stage 1: Build virtual environment, install faster-whisper and pyannote.audio
+# Stage 2: Hardened, non-root minimal runtime image with ffmpeg and healthcheck probe
+# ==============================================================================
+
+# ----------------- Stage 1: Build & Compilation Stage -----------------
+FROM python:3.11-slim AS builder
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    ffmpeg \
+    libsndfile1 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir \
+    fastapi>=0.110.0 \
+    uvicorn>=0.28.0 \
+    pydantic>=2.6.0 \
+    websockets>=12.0 \
+    faster-whisper>=1.0.1 \
+    pyannote.audio>=3.1.1 \
+    psutil>=5.9.8 \
+    numpy>=1.26.0
+
+# ----------------- Stage 2: Production Runtime Stage -----------------
+FROM python:3.11-slim AS runner
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    libsndfile1 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN groupadd -g 10001 clinix && \
+    useradd -u 10001 -g clinix -s /bin/bash -m appuser
+
+COPY --from=builder /opt/venv /opt/venv
+
+ENV PATH="/opt/venv/bin:$PATH"
+ENV PYTHONPATH=/app
+
+COPY inference/audio_server /app/inference/audio_server
+COPY inference/shared /app/inference/shared
+
+RUN chown -R appuser:clinix /app
+
+USER appuser
+
+EXPOSE 8003
+
+HEALTHCHECK --interval=20s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8003/health || exit 1
+
+CMD ["uvicorn", "inference.audio_server.server:app", "--host", "0.0.0.0", "--port", "8003"]

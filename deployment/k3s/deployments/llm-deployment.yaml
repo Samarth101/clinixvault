@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clinixvault-llm
+  namespace: clinixvault
+  labels:
+    app: clinixvault-llm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: clinixvault-llm
+  template:
+    metadata:
+      labels:
+        app: clinixvault-llm
+    spec:
+      containers:
+        - name: llm
+          image: clinixvault/llm:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8002
+          env:
+            - name: LLM_PORT
+              value: "8002"
+            - name: LLM_MODEL_PATH
+              value: "/app/models/mistral-7b-instruct-v0.2.Q4_K_M.gguf"
+          resources:
+            requests:
+              cpu: "1000m"
+              memory: "4Gi"
+            limits:
+              cpu: "4000m"
+              memory: "10Gi"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8002
+            initialDelaySeconds: 15
+            periodSeconds: 15

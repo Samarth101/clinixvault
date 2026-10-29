@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clinixvault-audio
+  namespace: clinixvault
+  labels:
+    app: clinixvault-audio
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: clinixvault-audio
+  template:
+    metadata:
+      labels:
+        app: clinixvault-audio
+    spec:
+      containers:
+        - name: audio
+          image: clinixvault/audio:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8003
+          env:
+            - name: AUDIO_PORT
+              value: "8003"
+            - name: WHISPER_MODEL_SIZE
+              value: "small.en"
+          resources:
+            requests:
+              cpu: "1000m"
+              memory: "2Gi"
+            limits:
+              cpu: "4000m"
+              memory: "6Gi"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8003
+            initialDelaySeconds: 10
+            periodSeconds: 15

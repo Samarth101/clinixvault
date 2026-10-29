@@ -1,0 +1,139 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clinixvault-postgres
+  namespace: clinixvault
+  labels:
+    app: clinixvault-postgres
+    role: database
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: clinixvault-postgres
+  template:
+    metadata:
+      labels:
+        app: clinixvault-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: pgvector/pgvector:pg16
+          ports:
+            - containerPort: 5432
+              name: postgres
+          env:
+            - name: POSTGRES_DB
+              value: clinixvault
+            - name: POSTGRES_USER
+              value: postgres
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: clinixvault-secrets
+                  key: POSTGRES_PASSWORD
+          volumeMounts:
+            - mountPath: /var/lib/postgresql/data
+              name: postgres-storage
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 2Gi
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres", "-d", "clinixvault"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres", "-d", "clinixvault"]
+            initialDelaySeconds: 15
+            periodSeconds: 20
+      volumes:
+        - name: postgres-storage
+          persistentVolumeClaim:
+            claimName: postgres-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: clinixvault-postgres
+  namespace: clinixvault
+spec:
+  selector:
+    app: clinixvault-postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+      name: postgres
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clinixvault-neo4j
+  namespace: clinixvault
+  labels:
+    app: clinixvault-neo4j
+    role: graph-database
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: clinixvault-neo4j
+  template:
+    metadata:
+      labels:
+        app: clinixvault-neo4j
+    spec:
+      containers:
+        - name: neo4j
+          image: neo4j:5-community
+          ports:
+            - containerPort: 7474
+              name: http
+            - containerPort: 7687
+              name: bolt
+          env:
+            - name: NEO4J_AUTH
+              value: "neo4j/clinixvault2026"
+            - name: NEO4J_PLUGINS
+              value: '["apoc"]'
+            - name: NEO4J_dbms_memory_pagecache_size
+              value: 512M
+            - name: NEO4J_dbms_memory_heap_initial__size
+              value: 512M
+            - name: NEO4J_dbms_memory_heap_max__size
+              value: 1G
+          volumeMounts:
+            - mountPath: /data
+              name: neo4j-storage
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 2000m
+              memory: 2Gi
+      volumes:
+        - name: neo4j-storage
+          persistentVolumeClaim:
+            claimName: neo4j-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: clinixvault-neo4j
+  namespace: clinixvault
+spec:
+  selector:
+    app: clinixvault-neo4j
+  ports:
+    - port: 7474
+      targetPort: 7474
+      name: http
+    - port: 7687
+      targetPort: 7687
+      name: bolt

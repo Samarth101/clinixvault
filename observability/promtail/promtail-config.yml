@@ -1,0 +1,58 @@
+# ==============================================================================
+# Promtail Configuration for ClinixVault Log Streaming
+# Tails local logs/ directory and pushes structured JSON logs to Grafana Cloud Loki
+# ==============================================================================
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/clinixvault-promtail-positions.yaml
+
+clients:
+  - url: '${GRAFANA_CLOUD_LOKI_URL}'
+    basic_auth:
+      username: '${GRAFANA_CLOUD_LOKI_USER}'
+      password: '${GRAFANA_CLOUD_API_TOKEN}'
+    backoff_config:
+      min_period: 500ms
+      max_period: 5m
+      max_retries: 10
+
+scrape_configs:
+  - job_name: clinixvault-logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: clinixvault
+          app: clinixvault-edge
+          environment: edge-production
+          __path__: /Users/samarthbhandegaonkar/Desktop/clinixvault/logs/*.log
+
+    pipeline_stages:
+      - json:
+          expressions:
+            timestamp: timestamp
+            level: level
+            logger: logger
+            module: module
+            service: service
+            status_code: status_code
+            method: method
+            path: path
+            client_ip: client_ip
+            patient_id: patient_id
+            request_id: request_id
+            duration_ms: duration_ms
+            message: message
+      - labels:
+          level:
+          logger:
+          service:
+          status_code:
+          method:
+      - timestamp:
+          source: timestamp
+          format: RFC3339

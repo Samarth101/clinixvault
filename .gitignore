@@ -1,0 +1,111 @@
+# ==============================================================================
+# ClinixVault Git Ignore Configuration
+# ==============================================================================
+
+# OS & Editor
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Python & Testing
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.dylib
+*.dll
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+develop-eggs/
+.installed.cfg
+lib/
+lib64/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+venv/
+.venv/
+env/
+ENV/
+
+# Node.js & Frontend
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+frontend/.vite/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment Variables & Secrets
+.env
+.env.*
+!.env.example
+!observability/.env.example
+frontend/.env.local
+frontend/.env.*.local
+colab_public_url.txt
+
+# Databases, Dynamic Records & Logs
+*.db
+*.sqlite
+*.sqlite3
+backend/database/*.db
+logs/
+*.log
+data-alloy/
+data/uploads/*
+!data/uploads/.gitkeep
+vault_audit_records/
+
+# Large Model Checkpoints & Pretrained Weights
+# (Checkpoints are managed via Hugging Face Hub: scripts/push_models_to_hf.py)
+models/
+*.gguf
+*.bin
+*.safetensors
+*.pt
+*.pth
+*.onnx
+*.h5
+*.ckpt
+*.tflite
+checkpoints/**/*.safetensors
+checkpoints/**/*.pt
+checkpoints/**/*.bin
+checkpoints/**/optimizer.pt
+checkpoints/**/scheduler.pt
+
+# Preserve checkpoint config files and cards in git
+!checkpoints/**/config.json
+!checkpoints/**/adapter_config.json
+!checkpoints/**/tokenizer_config.json
+!checkpoints/**/tokenizer.json
+!checkpoints/**/processor_config.json
+!checkpoints/**/special_tokens_map.json
+!checkpoints/**/chat_template.jinja
+!checkpoints/**/README.md
+!checkpoints/**/*.json

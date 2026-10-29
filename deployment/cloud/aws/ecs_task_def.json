@@ -1,0 +1,54 @@
+{
+  "family": "clinixvault-edge-suite",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["EC2"],
+  "cpu": "4096",
+  "memory": "16384",
+  "containerDefinitions": [
+    {
+      "name": "clinixvault-gateway",
+      "image": "123456789012.dkr.ecr.us-east-1.amazonaws.com/clinixvault-gateway:latest",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 8000,
+          "hostPort": 8000,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        { "name": "GATEWAY_PORT", "value": "8000" },
+        { "name": "VLM_URL", "value": "http://localhost:8001" },
+        { "name": "LLM_URL", "value": "http://localhost:8002" },
+        { "name": "AUDIO_URL", "value": "http://localhost:8003" },
+        { "name": "DOCUMENT_URL", "value": "http://localhost:8004" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/clinixvault",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "gateway"
+        }
+      }
+    },
+    {
+      "name": "clinixvault-vlm",
+      "image": "123456789012.dkr.ecr.us-east-1.amazonaws.com/clinixvault-vlm:latest",
+      "essential": true,
+      "portMappings": [{ "containerPort": 8001, "hostPort": 8001, "protocol": "tcp" }],
+      "resourceRequirements": [
+        { "type": "GPU", "value": "1" }
+      ]
+    },
+    {
+      "name": "clinixvault-llm",
+      "image": "123456789012.dkr.ecr.us-east-1.amazonaws.com/clinixvault-llm:latest",
+      "essential": true,
+      "portMappings": [{ "containerPort": 8002, "hostPort": 8002, "protocol": "tcp" }],
+      "resourceRequirements": [
+        { "type": "GPU", "value": "1" }
+      ]
+    }
+  ]
+}

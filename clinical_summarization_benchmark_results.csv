@@ -1,0 +1,5 @@
+model,paradigm,clinical_f1,chexpert_recall,hallucination_rate,rougeL,rouge1,rouge2,bleu_4,bleu_1,latency_ms
+Rule-Based Deductive Baseline,Heuristic Extraction,0.7423,73.29,13.0,0.2036,0.2118,0.1006,0.0705,0.1736,0.0
+Qwen2.5-3B-Instruct (Zero-Shot Base),Zero-Shot Prompting,0.63,62.33,32.0,0.0835,0.104,0.0316,0.0124,0.061,2806.77
+ClinixSummarizer-Qwen2.5-3B-QLoRA,Multi-Hospital QLoRA Fine-Tuned,0.8813,87.86,8.0,0.7191,0.7254,0.6436,0.5151,0.6739,852.18
+ClinixSummarizer-Qwen2.5-3B-DPO,DPO Preference Aligned,0.8964,89.12,5.5,0.7315,0.738,0.659,0.534,0.689,840.5

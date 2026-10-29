@@ -1,0 +1,902 @@
+[
+  {
+    "image_path": "../clinixvault/data/p10001038/f3e86afd-437eb86e-0f9bafb8-1e0f6f96-084ac17e.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "The lungs are clear bilaterally without focal consolidation, pneumothorax, or pleural effusion. Normal cardiac silhouette.",
+    "rejected": "The lungs are clear bilaterally focal dense airspace consolidation in the right midlung, pneumothorax, or pleural effusion. Normal cardiac silhouette.",
+    "flagged_hallucinations": [
+      "consolidation"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/28fad2ac-d6001216-b4f72c5b-2d4d452e-17b6c9a5.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Moderate cardiomegaly. Prominent pulmonary vascular congestion consistent with congestive heart failure. No acute focal pneumonia.",
+    "rejected": "Moderate cardiomegaly. Prominent pulmonary vascular congestion consistent with congestive heart failure. No acute focal pneumonia. Questionable foreign radiopaque density projected over the left hemithorax.",
+    "flagged_hallucinations": [
+      "support_devices"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/5cae71aa-99bb4662-41ef629e-7e89308c-5831ff9c.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Dense airspace consolidation in the right lower lobe consistent with acute pneumonia. Left lung is well expanded and clear.",
+    "rejected": "Dense airspace consolidation in the right lower lobe consistent with acute pneumonia. Left lung is well expanded and clear. Moderate blunting of the right costophrenic angle indicates a layered pleural effusion.",
+    "flagged_hallucinations": [
+      "pleural_effusion"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/dcfeeac4-1597e318-d0e6736a-8b2c2238-47ac3f1b.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Small apical pneumothorax is seen on the right with pleural line separation. Left lung field is clear without acute abnormality.",
+    "rejected": "Small apical pneumothorax is seen on the right with pleural line separation. Left lung field is clear without acute abnormality. Dense patchy opacities in the bilateral lung bases suspicious for active multifocal pneumonia.",
+    "flagged_hallucinations": [
+      "pneumonia"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/b79e55c3-735ce5ac-64412506-cdc9ea79-f1af521f.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Bilateral pleural effusions with costophrenic angle blunting. Mild interstitial pulmonary edema. Heart size is mildly enlarged.",
+    "rejected": "Bilateral pleural effusions with costophrenic angle blunting. Mild interstitial pulmonary edema. Heart size is mildly enlarged. Questionable foreign radiopaque density projected over the left hemithorax.",
+    "flagged_hallucinations": [
+      "support_devices"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/096052b7-d256dc40-453a102b-fa7d01c6-1b22c6b4.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Right subclavian dual-chamber pacemaker in stable anatomical position with leads terminating in right atrium and ventricle. Lungs clear.",
+    "rejected": "Right subclavian dual-chamber pacemaker in stable anatomical position with leads terminating in right atrium and ventricle. Lungs clear. Diffuse interstitial opacities with peribronchial cuffing reflecting moderate pulmonary vascular congestion.",
+    "flagged_hallucinations": [
+      "edema"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/f3e86afd-437eb86e-0f9bafb8-1e0f6f96-084ac17e.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Bibasilar atelectasis noted. No pneumothorax. Cardiomediastinal silhouette within normal limits.",
+    "rejected": "Bibasilar atelectasis noted. small right apical pneumothorax is identified. Cardiomediastinal silhouette within normal limits.",
+    "flagged_hallucinations": [
+      "pneumothorax"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/28fad2ac-d6001216-b4f72c5b-2d4d452e-17b6c9a5.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Median sternotomy closure wires intact from prior CABG. No acute cardiopulmonary findings. Clear bilateral lung fields.",
+    "rejected": "Median sternotomy closure wires intact from prior CABG. No acute cardiopulmonary findings. Clear bilateral lung fields. Cardiomegaly is moderately pronounced with prominent cardiomediastinal contour widening.",
+    "flagged_hallucinations": [
+      "cardiomegaly"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/5cae71aa-99bb4662-41ef629e-7e89308c-5831ff9c.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Peripherally inserted central catheter terminating in superior vena cava caviatrial junction. Lungs are clear.",
+    "rejected": "Peripherally inserted central catheter terminating in superior vena cava caviatrial junction. Lungs are clear. Cardiomegaly is moderately pronounced with prominent cardiomediastinal contour widening.",
+    "flagged_hallucinations": [
+      "cardiomegaly"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/dcfeeac4-1597e318-d0e6736a-8b2c2238-47ac3f1b.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Healed right rib fracture. Clear lung parenchyma without pneumothorax or pleural effusion.",
+    "rejected": "Healed right rib fracture. Clear lung parenchyma small right apical pneumothorax is identified or pleural effusion.",
+    "flagged_hallucinations": [
+      "pneumothorax"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/b79e55c3-735ce5ac-64412506-cdc9ea79-f1af521f.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "The lungs are clear bilaterally without focal consolidation, pneumothorax, or pleural effusion. Normal cardiac silhouette.",
+    "rejected": "The lungs are clear bilaterally focal dense airspace consolidation in the right midlung, pneumothorax, or pleural effusion. Normal cardiac silhouette.",
+    "flagged_hallucinations": [
+      "consolidation"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/096052b7-d256dc40-453a102b-fa7d01c6-1b22c6b4.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Moderate cardiomegaly. Prominent pulmonary vascular congestion consistent with congestive heart failure. No acute focal pneumonia.",
+    "rejected": "Moderate cardiomegaly. Prominent pulmonary vascular congestion consistent with congestive heart failure. No acute focal pneumonia. Linear band-like atelectasis noted in the left retrocardiac space.",
+    "flagged_hallucinations": [
+      "atelectasis"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/f3e86afd-437eb86e-0f9bafb8-1e0f6f96-084ac17e.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Dense airspace consolidation in the right lower lobe consistent with acute pneumonia. Left lung is well expanded and clear.",
+    "rejected": "Dense airspace consolidation in the right lower lobe consistent with acute pneumonia. Left lung is well expanded and clear. Moderate blunting of the right costophrenic angle indicates a layered pleural effusion.",
+    "flagged_hallucinations": [
+      "pleural_effusion"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/28fad2ac-d6001216-b4f72c5b-2d4d452e-17b6c9a5.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Small apical pneumothorax is seen on the right with pleural line separation. Left lung field is clear without acute abnormality.",
+    "rejected": "Small apical pneumothorax is seen on the right with pleural line separation. Left lung field is clear without acute abnormality. Moderate blunting of the right costophrenic angle indicates a layered pleural effusion.",
+    "flagged_hallucinations": [
+      "pleural_effusion"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/5cae71aa-99bb4662-41ef629e-7e89308c-5831ff9c.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Bilateral pleural effusions with costophrenic angle blunting. Mild interstitial pulmonary edema. Heart size is mildly enlarged.",
+    "rejected": "Bilateral pleural effusions with costophrenic angle blunting. Mild interstitial pulmonary edema. Heart size is mildly enlarged. Questionable foreign radiopaque density projected over the left hemithorax.",
+    "flagged_hallucinations": [
+      "support_devices"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/dcfeeac4-1597e318-d0e6736a-8b2c2238-47ac3f1b.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Right subclavian dual-chamber pacemaker in stable anatomical position with leads terminating in right atrium and ventricle. Lungs clear.",
+    "rejected": "Right subclavian dual-chamber pacemaker in stable anatomical position with leads terminating in right atrium and ventricle. Lungs clear. Moderate blunting of the right costophrenic angle indicates a layered pleural effusion.",
+    "flagged_hallucinations": [
+      "pleural_effusion"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/b79e55c3-735ce5ac-64412506-cdc9ea79-f1af521f.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Bibasilar atelectasis noted. No pneumothorax. Cardiomediastinal silhouette within normal limits.",
+    "rejected": "Bibasilar atelectasis noted. small right apical pneumothorax is identified. Cardiomediastinal silhouette within normal limits.",
+    "flagged_hallucinations": [
+      "pneumothorax"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/096052b7-d256dc40-453a102b-fa7d01c6-1b22c6b4.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Median sternotomy closure wires intact from prior CABG. No acute cardiopulmonary findings. Clear bilateral lung fields.",
+    "rejected": "Median sternotomy closure wires intact from prior CABG. No acute cardiopulmonary findings. Clear bilateral lung fields. Dense patchy opacities in the bilateral lung bases suspicious for active multifocal pneumonia.",
+    "flagged_hallucinations": [
+      "pneumonia"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/f3e86afd-437eb86e-0f9bafb8-1e0f6f96-084ac17e.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Peripherally inserted central catheter terminating in superior vena cava caviatrial junction. Lungs are clear.",
+    "rejected": "Peripherally inserted central catheter terminating in superior vena cava caviatrial junction. Lungs are clear. Dense patchy opacities in the bilateral lung bases suspicious for active multifocal pneumonia.",
+    "flagged_hallucinations": [
+      "pneumonia"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/28fad2ac-d6001216-b4f72c5b-2d4d452e-17b6c9a5.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Healed right rib fracture. Clear lung parenchyma without pneumothorax or pleural effusion.",
+    "rejected": "Healed right rib fracture. Clear lung parenchyma small right apical pneumothorax is identified or pleural effusion.",
+    "flagged_hallucinations": [
+      "pneumothorax"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/5cae71aa-99bb4662-41ef629e-7e89308c-5831ff9c.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "The lungs are clear bilaterally without focal consolidation, pneumothorax, or pleural effusion. Normal cardiac silhouette.",
+    "rejected": "The lungs are clear bilaterally focal dense airspace consolidation in the right midlung, pneumothorax, or pleural effusion. Normal cardiac silhouette.",
+    "flagged_hallucinations": [
+      "consolidation"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/dcfeeac4-1597e318-d0e6736a-8b2c2238-47ac3f1b.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Moderate cardiomegaly. Prominent pulmonary vascular congestion consistent with congestive heart failure. No acute focal pneumonia.",
+    "rejected": "Moderate cardiomegaly. Prominent pulmonary vascular congestion consistent with congestive heart failure. No acute focal pneumonia. Focal airspace consolidation is noted in the right lower lobe consistent with acute bronchopneumonia.",
+    "flagged_hallucinations": [
+      "consolidation"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/b79e55c3-735ce5ac-64412506-cdc9ea79-f1af521f.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Dense airspace consolidation in the right lower lobe consistent with acute pneumonia. Left lung is well expanded and clear.",
+    "rejected": "Dense airspace consolidation in the right lower lobe consistent with acute pneumonia. Left lung is well expanded and clear. Moderate blunting of the right costophrenic angle indicates a layered pleural effusion.",
+    "flagged_hallucinations": [
+      "pleural_effusion"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/096052b7-d256dc40-453a102b-fa7d01c6-1b22c6b4.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Small apical pneumothorax is seen on the right with pleural line separation. Left lung field is clear without acute abnormality.",
+    "rejected": "Small apical pneumothorax is seen on the right with pleural line separation. Left lung field is clear without acute abnormality. Focal airspace consolidation is noted in the right lower lobe consistent with acute bronchopneumonia.",
+    "flagged_hallucinations": [
+      "consolidation"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/f3e86afd-437eb86e-0f9bafb8-1e0f6f96-084ac17e.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Bilateral pleural effusions with costophrenic angle blunting. Mild interstitial pulmonary edema. Heart size is mildly enlarged.",
+    "rejected": "Bilateral pleural effusions with costophrenic angle blunting. Mild interstitial pulmonary edema. Heart size is mildly enlarged. Linear band-like atelectasis noted in the left retrocardiac space.",
+    "flagged_hallucinations": [
+      "atelectasis"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/28fad2ac-d6001216-b4f72c5b-2d4d452e-17b6c9a5.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Right subclavian dual-chamber pacemaker in stable anatomical position with leads terminating in right atrium and ventricle. Lungs clear.",
+    "rejected": "Right subclavian dual-chamber pacemaker in stable anatomical position with leads terminating in right atrium and ventricle. Lungs clear. Diffuse interstitial opacities with peribronchial cuffing reflecting moderate pulmonary vascular congestion.",
+    "flagged_hallucinations": [
+      "edema"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/5cae71aa-99bb4662-41ef629e-7e89308c-5831ff9c.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Bibasilar atelectasis noted. No pneumothorax. Cardiomediastinal silhouette within normal limits.",
+    "rejected": "Bibasilar atelectasis noted. small right apical pneumothorax is identified. Cardiomediastinal silhouette within normal limits.",
+    "flagged_hallucinations": [
+      "pneumothorax"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/dcfeeac4-1597e318-d0e6736a-8b2c2238-47ac3f1b.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Median sternotomy closure wires intact from prior CABG. No acute cardiopulmonary findings. Clear bilateral lung fields.",
+    "rejected": "Median sternotomy closure wires intact from prior CABG. No acute cardiopulmonary findings. Clear bilateral lung fields. Linear band-like atelectasis noted in the left retrocardiac space.",
+    "flagged_hallucinations": [
+      "atelectasis"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/b79e55c3-735ce5ac-64412506-cdc9ea79-f1af521f.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Peripherally inserted central catheter terminating in superior vena cava caviatrial junction. Lungs are clear.",
+    "rejected": "Peripherally inserted central catheter terminating in superior vena cava caviatrial junction. Lungs are clear. Moderate blunting of the right costophrenic angle indicates a layered pleural effusion.",
+    "flagged_hallucinations": [
+      "pleural_effusion"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/096052b7-d256dc40-453a102b-fa7d01c6-1b22c6b4.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Healed right rib fracture. Clear lung parenchyma without pneumothorax or pleural effusion.",
+    "rejected": "Healed right rib fracture. Clear lung parenchyma small right apical pneumothorax is identified or pleural effusion.",
+    "flagged_hallucinations": [
+      "pneumothorax"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/f3e86afd-437eb86e-0f9bafb8-1e0f6f96-084ac17e.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "The lungs are clear bilaterally without focal consolidation, pneumothorax, or pleural effusion. Normal cardiac silhouette.",
+    "rejected": "The lungs are clear bilaterally focal dense airspace consolidation in the right midlung, pneumothorax, or pleural effusion. Normal cardiac silhouette.",
+    "flagged_hallucinations": [
+      "consolidation"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/28fad2ac-d6001216-b4f72c5b-2d4d452e-17b6c9a5.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Moderate cardiomegaly. Prominent pulmonary vascular congestion consistent with congestive heart failure. No acute focal pneumonia.",
+    "rejected": "Moderate cardiomegaly. Prominent pulmonary vascular congestion consistent with congestive heart failure. No acute focal pneumonia. Linear band-like atelectasis noted in the left retrocardiac space.",
+    "flagged_hallucinations": [
+      "atelectasis"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/5cae71aa-99bb4662-41ef629e-7e89308c-5831ff9c.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Dense airspace consolidation in the right lower lobe consistent with acute pneumonia. Left lung is well expanded and clear.",
+    "rejected": "Dense airspace consolidation in the right lower lobe consistent with acute pneumonia. Left lung is well expanded and clear. Diffuse interstitial opacities with peribronchial cuffing reflecting moderate pulmonary vascular congestion.",
+    "flagged_hallucinations": [
+      "edema"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/dcfeeac4-1597e318-d0e6736a-8b2c2238-47ac3f1b.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Small apical pneumothorax is seen on the right with pleural line separation. Left lung field is clear without acute abnormality.",
+    "rejected": "Small apical pneumothorax is seen on the right with pleural line separation. Left lung field is clear without acute abnormality. Linear band-like atelectasis noted in the left retrocardiac space.",
+    "flagged_hallucinations": [
+      "atelectasis"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/b79e55c3-735ce5ac-64412506-cdc9ea79-f1af521f.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Bilateral pleural effusions with costophrenic angle blunting. Mild interstitial pulmonary edema. Heart size is mildly enlarged.",
+    "rejected": "Bilateral pleural effusions with costophrenic angle blunting. Mild interstitial pulmonary edema. Heart size is mildly enlarged. Linear band-like atelectasis noted in the left retrocardiac space.",
+    "flagged_hallucinations": [
+      "atelectasis"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/096052b7-d256dc40-453a102b-fa7d01c6-1b22c6b4.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Right subclavian dual-chamber pacemaker in stable anatomical position with leads terminating in right atrium and ventricle. Lungs clear.",
+    "rejected": "Right subclavian dual-chamber pacemaker in stable anatomical position with leads terminating in right atrium and ventricle. Lungs clear. Linear band-like atelectasis noted in the left retrocardiac space.",
+    "flagged_hallucinations": [
+      "atelectasis"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/f3e86afd-437eb86e-0f9bafb8-1e0f6f96-084ac17e.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Bibasilar atelectasis noted. No pneumothorax. Cardiomediastinal silhouette within normal limits.",
+    "rejected": "Bibasilar atelectasis noted. small right apical pneumothorax is identified. Cardiomediastinal silhouette within normal limits.",
+    "flagged_hallucinations": [
+      "pneumothorax"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/28fad2ac-d6001216-b4f72c5b-2d4d452e-17b6c9a5.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Median sternotomy closure wires intact from prior CABG. No acute cardiopulmonary findings. Clear bilateral lung fields.",
+    "rejected": "Median sternotomy closure wires intact from prior CABG. No acute cardiopulmonary findings. Clear bilateral lung fields. Small apical pneumothorax is identified on the right measuring approximately 1.5 cm.",
+    "flagged_hallucinations": [
+      "pneumothorax"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/5cae71aa-99bb4662-41ef629e-7e89308c-5831ff9c.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Peripherally inserted central catheter terminating in superior vena cava caviatrial junction. Lungs are clear.",
+    "rejected": "Peripherally inserted central catheter terminating in superior vena cava caviatrial junction. Lungs are clear. Dense patchy opacities in the bilateral lung bases suspicious for active multifocal pneumonia.",
+    "flagged_hallucinations": [
+      "pneumonia"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/dcfeeac4-1597e318-d0e6736a-8b2c2238-47ac3f1b.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Healed right rib fracture. Clear lung parenchyma without pneumothorax or pleural effusion.",
+    "rejected": "Healed right rib fracture. Clear lung parenchyma small right apical pneumothorax is identified or pleural effusion.",
+    "flagged_hallucinations": [
+      "pneumothorax"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/b79e55c3-735ce5ac-64412506-cdc9ea79-f1af521f.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "The lungs are clear bilaterally without focal consolidation, pneumothorax, or pleural effusion. Normal cardiac silhouette.",
+    "rejected": "The lungs are clear bilaterally focal dense airspace consolidation in the right midlung, pneumothorax, or pleural effusion. Normal cardiac silhouette.",
+    "flagged_hallucinations": [
+      "consolidation"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/096052b7-d256dc40-453a102b-fa7d01c6-1b22c6b4.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Moderate cardiomegaly. Prominent pulmonary vascular congestion consistent with congestive heart failure. No acute focal pneumonia.",
+    "rejected": "Moderate cardiomegaly. Prominent pulmonary vascular congestion consistent with congestive heart failure. No acute focal pneumonia. Questionable foreign radiopaque density projected over the left hemithorax.",
+    "flagged_hallucinations": [
+      "support_devices"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/f3e86afd-437eb86e-0f9bafb8-1e0f6f96-084ac17e.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Dense airspace consolidation in the right lower lobe consistent with acute pneumonia. Left lung is well expanded and clear.",
+    "rejected": "Dense airspace consolidation in the right lower lobe consistent with acute pneumonia. Left lung is well expanded and clear. Linear band-like atelectasis noted in the left retrocardiac space.",
+    "flagged_hallucinations": [
+      "atelectasis"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/28fad2ac-d6001216-b4f72c5b-2d4d452e-17b6c9a5.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Small apical pneumothorax is seen on the right with pleural line separation. Left lung field is clear without acute abnormality.",
+    "rejected": "Small apical pneumothorax is seen on the right with pleural line separation. Left lung field is clear without acute abnormality. Cardiomegaly is moderately pronounced with prominent cardiomediastinal contour widening.",
+    "flagged_hallucinations": [
+      "cardiomegaly"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/5cae71aa-99bb4662-41ef629e-7e89308c-5831ff9c.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Bilateral pleural effusions with costophrenic angle blunting. Mild interstitial pulmonary edema. Heart size is mildly enlarged.",
+    "rejected": "Bilateral pleural effusions with costophrenic angle blunting. Mild interstitial pulmonary edema. Heart size is mildly enlarged. Linear band-like atelectasis noted in the left retrocardiac space.",
+    "flagged_hallucinations": [
+      "atelectasis"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/dcfeeac4-1597e318-d0e6736a-8b2c2238-47ac3f1b.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Right subclavian dual-chamber pacemaker in stable anatomical position with leads terminating in right atrium and ventricle. Lungs clear.",
+    "rejected": "Right subclavian dual-chamber pacemaker in stable anatomical position with leads terminating in right atrium and ventricle. Lungs clear. Diffuse interstitial opacities with peribronchial cuffing reflecting moderate pulmonary vascular congestion.",
+    "flagged_hallucinations": [
+      "edema"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/b79e55c3-735ce5ac-64412506-cdc9ea79-f1af521f.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Bibasilar atelectasis noted. No pneumothorax. Cardiomediastinal silhouette within normal limits.",
+    "rejected": "Bibasilar atelectasis noted. small right apical pneumothorax is identified. Cardiomediastinal silhouette within normal limits.",
+    "flagged_hallucinations": [
+      "pneumothorax"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/096052b7-d256dc40-453a102b-fa7d01c6-1b22c6b4.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Median sternotomy closure wires intact from prior CABG. No acute cardiopulmonary findings. Clear bilateral lung fields.",
+    "rejected": "Median sternotomy closure wires intact from prior CABG. No acute cardiopulmonary findings. Clear bilateral lung fields. Cardiomegaly is moderately pronounced with prominent cardiomediastinal contour widening.",
+    "flagged_hallucinations": [
+      "cardiomegaly"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/f3e86afd-437eb86e-0f9bafb8-1e0f6f96-084ac17e.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Peripherally inserted central catheter terminating in superior vena cava caviatrial junction. Lungs are clear.",
+    "rejected": "Peripherally inserted central catheter terminating in superior vena cava caviatrial junction. Lungs are clear. Diffuse interstitial opacities with peribronchial cuffing reflecting moderate pulmonary vascular congestion.",
+    "flagged_hallucinations": [
+      "edema"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/28fad2ac-d6001216-b4f72c5b-2d4d452e-17b6c9a5.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Healed right rib fracture. Clear lung parenchyma without pneumothorax or pleural effusion.",
+    "rejected": "Healed right rib fracture. Clear lung parenchyma small right apical pneumothorax is identified or pleural effusion.",
+    "flagged_hallucinations": [
+      "pneumothorax"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/5cae71aa-99bb4662-41ef629e-7e89308c-5831ff9c.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "The lungs are clear bilaterally without focal consolidation, pneumothorax, or pleural effusion. Normal cardiac silhouette.",
+    "rejected": "The lungs are clear bilaterally focal dense airspace consolidation in the right midlung, pneumothorax, or pleural effusion. Normal cardiac silhouette.",
+    "flagged_hallucinations": [
+      "consolidation"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/dcfeeac4-1597e318-d0e6736a-8b2c2238-47ac3f1b.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Moderate cardiomegaly. Prominent pulmonary vascular congestion consistent with congestive heart failure. No acute focal pneumonia.",
+    "rejected": "Moderate cardiomegaly. Prominent pulmonary vascular congestion consistent with congestive heart failure. No acute focal pneumonia. Focal airspace consolidation is noted in the right lower lobe consistent with acute bronchopneumonia.",
+    "flagged_hallucinations": [
+      "consolidation"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/b79e55c3-735ce5ac-64412506-cdc9ea79-f1af521f.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Dense airspace consolidation in the right lower lobe consistent with acute pneumonia. Left lung is well expanded and clear.",
+    "rejected": "Dense airspace consolidation in the right lower lobe consistent with acute pneumonia. Left lung is well expanded and clear. Moderate blunting of the right costophrenic angle indicates a layered pleural effusion.",
+    "flagged_hallucinations": [
+      "pleural_effusion"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/096052b7-d256dc40-453a102b-fa7d01c6-1b22c6b4.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Small apical pneumothorax is seen on the right with pleural line separation. Left lung field is clear without acute abnormality.",
+    "rejected": "Small apical pneumothorax is seen on the right with pleural line separation. Left lung field is clear without acute abnormality. Dense patchy opacities in the bilateral lung bases suspicious for active multifocal pneumonia.",
+    "flagged_hallucinations": [
+      "pneumonia"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/f3e86afd-437eb86e-0f9bafb8-1e0f6f96-084ac17e.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Bilateral pleural effusions with costophrenic angle blunting. Mild interstitial pulmonary edema. Heart size is mildly enlarged.",
+    "rejected": "Bilateral pleural effusions with costophrenic angle blunting. Mild interstitial pulmonary edema. Heart size is mildly enlarged. Linear band-like atelectasis noted in the left retrocardiac space.",
+    "flagged_hallucinations": [
+      "atelectasis"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/28fad2ac-d6001216-b4f72c5b-2d4d452e-17b6c9a5.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Right subclavian dual-chamber pacemaker in stable anatomical position with leads terminating in right atrium and ventricle. Lungs clear.",
+    "rejected": "Right subclavian dual-chamber pacemaker in stable anatomical position with leads terminating in right atrium and ventricle. Lungs clear. Small apical pneumothorax is identified on the right measuring approximately 1.5 cm.",
+    "flagged_hallucinations": [
+      "pneumothorax"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/5cae71aa-99bb4662-41ef629e-7e89308c-5831ff9c.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Bibasilar atelectasis noted. No pneumothorax. Cardiomediastinal silhouette within normal limits.",
+    "rejected": "Bibasilar atelectasis noted. small right apical pneumothorax is identified. Cardiomediastinal silhouette within normal limits.",
+    "flagged_hallucinations": [
+      "pneumothorax"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/dcfeeac4-1597e318-d0e6736a-8b2c2238-47ac3f1b.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Median sternotomy closure wires intact from prior CABG. No acute cardiopulmonary findings. Clear bilateral lung fields.",
+    "rejected": "Median sternotomy closure wires intact from prior CABG. No acute cardiopulmonary findings. Clear bilateral lung fields. Focal airspace consolidation is noted in the right lower lobe consistent with acute bronchopneumonia.",
+    "flagged_hallucinations": [
+      "consolidation"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/b79e55c3-735ce5ac-64412506-cdc9ea79-f1af521f.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Peripherally inserted central catheter terminating in superior vena cava caviatrial junction. Lungs are clear.",
+    "rejected": "Peripherally inserted central catheter terminating in superior vena cava caviatrial junction. Lungs are clear. Focal airspace consolidation is noted in the right lower lobe consistent with acute bronchopneumonia.",
+    "flagged_hallucinations": [
+      "consolidation"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/096052b7-d256dc40-453a102b-fa7d01c6-1b22c6b4.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Healed right rib fracture. Clear lung parenchyma without pneumothorax or pleural effusion.",
+    "rejected": "Healed right rib fracture. Clear lung parenchyma small right apical pneumothorax is identified or pleural effusion.",
+    "flagged_hallucinations": [
+      "pneumothorax"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/f3e86afd-437eb86e-0f9bafb8-1e0f6f96-084ac17e.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "The lungs are clear bilaterally without focal consolidation, pneumothorax, or pleural effusion. Normal cardiac silhouette.",
+    "rejected": "The lungs are clear bilaterally focal dense airspace consolidation in the right midlung, pneumothorax, or pleural effusion. Normal cardiac silhouette.",
+    "flagged_hallucinations": [
+      "consolidation"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/28fad2ac-d6001216-b4f72c5b-2d4d452e-17b6c9a5.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Moderate cardiomegaly. Prominent pulmonary vascular congestion consistent with congestive heart failure. No acute focal pneumonia.",
+    "rejected": "Moderate cardiomegaly. Prominent pulmonary vascular congestion consistent with congestive heart failure. No acute focal pneumonia. Questionable foreign radiopaque density projected over the left hemithorax.",
+    "flagged_hallucinations": [
+      "support_devices"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/5cae71aa-99bb4662-41ef629e-7e89308c-5831ff9c.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Dense airspace consolidation in the right lower lobe consistent with acute pneumonia. Left lung is well expanded and clear.",
+    "rejected": "Dense airspace consolidation in the right lower lobe consistent with acute pneumonia. Left lung is well expanded and clear. Moderate blunting of the right costophrenic angle indicates a layered pleural effusion.",
+    "flagged_hallucinations": [
+      "pleural_effusion"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/dcfeeac4-1597e318-d0e6736a-8b2c2238-47ac3f1b.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Small apical pneumothorax is seen on the right with pleural line separation. Left lung field is clear without acute abnormality.",
+    "rejected": "Small apical pneumothorax is seen on the right with pleural line separation. Left lung field is clear without acute abnormality. Cardiomegaly is moderately pronounced with prominent cardiomediastinal contour widening.",
+    "flagged_hallucinations": [
+      "cardiomegaly"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/b79e55c3-735ce5ac-64412506-cdc9ea79-f1af521f.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Bilateral pleural effusions with costophrenic angle blunting. Mild interstitial pulmonary edema. Heart size is mildly enlarged.",
+    "rejected": "Bilateral pleural effusions with costophrenic angle blunting. Mild interstitial pulmonary edema. Heart size is mildly enlarged. Focal airspace consolidation is noted in the right lower lobe consistent with acute bronchopneumonia.",
+    "flagged_hallucinations": [
+      "consolidation"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/096052b7-d256dc40-453a102b-fa7d01c6-1b22c6b4.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Right subclavian dual-chamber pacemaker in stable anatomical position with leads terminating in right atrium and ventricle. Lungs clear.",
+    "rejected": "Right subclavian dual-chamber pacemaker in stable anatomical position with leads terminating in right atrium and ventricle. Lungs clear. Linear band-like atelectasis noted in the left retrocardiac space.",
+    "flagged_hallucinations": [
+      "atelectasis"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/f3e86afd-437eb86e-0f9bafb8-1e0f6f96-084ac17e.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Bibasilar atelectasis noted. No pneumothorax. Cardiomediastinal silhouette within normal limits.",
+    "rejected": "Bibasilar atelectasis noted. small right apical pneumothorax is identified. Cardiomediastinal silhouette within normal limits.",
+    "flagged_hallucinations": [
+      "pneumothorax"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/28fad2ac-d6001216-b4f72c5b-2d4d452e-17b6c9a5.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Median sternotomy closure wires intact from prior CABG. No acute cardiopulmonary findings. Clear bilateral lung fields.",
+    "rejected": "Median sternotomy closure wires intact from prior CABG. No acute cardiopulmonary findings. Clear bilateral lung fields. Dense patchy opacities in the bilateral lung bases suspicious for active multifocal pneumonia.",
+    "flagged_hallucinations": [
+      "pneumonia"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/5cae71aa-99bb4662-41ef629e-7e89308c-5831ff9c.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Peripherally inserted central catheter terminating in superior vena cava caviatrial junction. Lungs are clear.",
+    "rejected": "Peripherally inserted central catheter terminating in superior vena cava caviatrial junction. Lungs are clear. Focal airspace consolidation is noted in the right lower lobe consistent with acute bronchopneumonia.",
+    "flagged_hallucinations": [
+      "consolidation"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/dcfeeac4-1597e318-d0e6736a-8b2c2238-47ac3f1b.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Healed right rib fracture. Clear lung parenchyma without pneumothorax or pleural effusion.",
+    "rejected": "Healed right rib fracture. Clear lung parenchyma small right apical pneumothorax is identified or pleural effusion.",
+    "flagged_hallucinations": [
+      "pneumothorax"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/b79e55c3-735ce5ac-64412506-cdc9ea79-f1af521f.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "The lungs are clear bilaterally without focal consolidation, pneumothorax, or pleural effusion. Normal cardiac silhouette.",
+    "rejected": "The lungs are clear bilaterally focal dense airspace consolidation in the right midlung, pneumothorax, or pleural effusion. Normal cardiac silhouette.",
+    "flagged_hallucinations": [
+      "consolidation"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/096052b7-d256dc40-453a102b-fa7d01c6-1b22c6b4.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Moderate cardiomegaly. Prominent pulmonary vascular congestion consistent with congestive heart failure. No acute focal pneumonia.",
+    "rejected": "Moderate cardiomegaly. Prominent pulmonary vascular congestion consistent with congestive heart failure. No acute focal pneumonia. Focal airspace consolidation is noted in the right lower lobe consistent with acute bronchopneumonia.",
+    "flagged_hallucinations": [
+      "consolidation"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/f3e86afd-437eb86e-0f9bafb8-1e0f6f96-084ac17e.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Dense airspace consolidation in the right lower lobe consistent with acute pneumonia. Left lung is well expanded and clear.",
+    "rejected": "Dense airspace consolidation in the right lower lobe consistent with acute pneumonia. Left lung is well expanded and clear. Linear band-like atelectasis noted in the left retrocardiac space.",
+    "flagged_hallucinations": [
+      "atelectasis"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/28fad2ac-d6001216-b4f72c5b-2d4d452e-17b6c9a5.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Small apical pneumothorax is seen on the right with pleural line separation. Left lung field is clear without acute abnormality.",
+    "rejected": "Small apical pneumothorax is seen on the right with pleural line separation. Left lung field is clear without acute abnormality. Moderate blunting of the right costophrenic angle indicates a layered pleural effusion.",
+    "flagged_hallucinations": [
+      "pleural_effusion"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/5cae71aa-99bb4662-41ef629e-7e89308c-5831ff9c.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Bilateral pleural effusions with costophrenic angle blunting. Mild interstitial pulmonary edema. Heart size is mildly enlarged.",
+    "rejected": "Bilateral pleural effusions with costophrenic angle blunting. Mild interstitial pulmonary edema. Heart size is mildly enlarged. Questionable foreign radiopaque density projected over the left hemithorax.",
+    "flagged_hallucinations": [
+      "support_devices"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/dcfeeac4-1597e318-d0e6736a-8b2c2238-47ac3f1b.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Right subclavian dual-chamber pacemaker in stable anatomical position with leads terminating in right atrium and ventricle. Lungs clear.",
+    "rejected": "Right subclavian dual-chamber pacemaker in stable anatomical position with leads terminating in right atrium and ventricle. Lungs clear. Focal airspace consolidation is noted in the right lower lobe consistent with acute bronchopneumonia.",
+    "flagged_hallucinations": [
+      "consolidation"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/b79e55c3-735ce5ac-64412506-cdc9ea79-f1af521f.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Bibasilar atelectasis noted. No pneumothorax. Cardiomediastinal silhouette within normal limits.",
+    "rejected": "Bibasilar atelectasis noted. small right apical pneumothorax is identified. Cardiomediastinal silhouette within normal limits.",
+    "flagged_hallucinations": [
+      "pneumothorax"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/096052b7-d256dc40-453a102b-fa7d01c6-1b22c6b4.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Median sternotomy closure wires intact from prior CABG. No acute cardiopulmonary findings. Clear bilateral lung fields.",
+    "rejected": "Median sternotomy closure wires intact from prior CABG. No acute cardiopulmonary findings. Clear bilateral lung fields. Moderate blunting of the right costophrenic angle indicates a layered pleural effusion.",
+    "flagged_hallucinations": [
+      "pleural_effusion"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/f3e86afd-437eb86e-0f9bafb8-1e0f6f96-084ac17e.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Peripherally inserted central catheter terminating in superior vena cava caviatrial junction. Lungs are clear.",
+    "rejected": "Peripherally inserted central catheter terminating in superior vena cava caviatrial junction. Lungs are clear. Moderate blunting of the right costophrenic angle indicates a layered pleural effusion.",
+    "flagged_hallucinations": [
+      "pleural_effusion"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/28fad2ac-d6001216-b4f72c5b-2d4d452e-17b6c9a5.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Healed right rib fracture. Clear lung parenchyma without pneumothorax or pleural effusion.",
+    "rejected": "Healed right rib fracture. Clear lung parenchyma small right apical pneumothorax is identified or pleural effusion.",
+    "flagged_hallucinations": [
+      "pneumothorax"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/5cae71aa-99bb4662-41ef629e-7e89308c-5831ff9c.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "The lungs are clear bilaterally without focal consolidation, pneumothorax, or pleural effusion. Normal cardiac silhouette.",
+    "rejected": "The lungs are clear bilaterally focal dense airspace consolidation in the right midlung, pneumothorax, or pleural effusion. Normal cardiac silhouette.",
+    "flagged_hallucinations": [
+      "consolidation"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/dcfeeac4-1597e318-d0e6736a-8b2c2238-47ac3f1b.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Moderate cardiomegaly. Prominent pulmonary vascular congestion consistent with congestive heart failure. No acute focal pneumonia.",
+    "rejected": "Moderate cardiomegaly. Prominent pulmonary vascular congestion consistent with congestive heart failure. No acute focal pneumonia. Focal airspace consolidation is noted in the right lower lobe consistent with acute bronchopneumonia.",
+    "flagged_hallucinations": [
+      "consolidation"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/b79e55c3-735ce5ac-64412506-cdc9ea79-f1af521f.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Dense airspace consolidation in the right lower lobe consistent with acute pneumonia. Left lung is well expanded and clear.",
+    "rejected": "Dense airspace consolidation in the right lower lobe consistent with acute pneumonia. Left lung is well expanded and clear. Questionable foreign radiopaque density projected over the left hemithorax.",
+    "flagged_hallucinations": [
+      "support_devices"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/096052b7-d256dc40-453a102b-fa7d01c6-1b22c6b4.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Small apical pneumothorax is seen on the right with pleural line separation. Left lung field is clear without acute abnormality.",
+    "rejected": "Small apical pneumothorax is seen on the right with pleural line separation. Left lung field is clear without acute abnormality. Dense patchy opacities in the bilateral lung bases suspicious for active multifocal pneumonia.",
+    "flagged_hallucinations": [
+      "pneumonia"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/f3e86afd-437eb86e-0f9bafb8-1e0f6f96-084ac17e.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Bilateral pleural effusions with costophrenic angle blunting. Mild interstitial pulmonary edema. Heart size is mildly enlarged.",
+    "rejected": "Bilateral pleural effusions with costophrenic angle blunting. Mild interstitial pulmonary edema. Heart size is mildly enlarged. Linear band-like atelectasis noted in the left retrocardiac space.",
+    "flagged_hallucinations": [
+      "atelectasis"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/28fad2ac-d6001216-b4f72c5b-2d4d452e-17b6c9a5.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Right subclavian dual-chamber pacemaker in stable anatomical position with leads terminating in right atrium and ventricle. Lungs clear.",
+    "rejected": "Right subclavian dual-chamber pacemaker in stable anatomical position with leads terminating in right atrium and ventricle. Lungs clear. Diffuse interstitial opacities with peribronchial cuffing reflecting moderate pulmonary vascular congestion.",
+    "flagged_hallucinations": [
+      "edema"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/5cae71aa-99bb4662-41ef629e-7e89308c-5831ff9c.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Bibasilar atelectasis noted. No pneumothorax. Cardiomediastinal silhouette within normal limits.",
+    "rejected": "Bibasilar atelectasis noted. small right apical pneumothorax is identified. Cardiomediastinal silhouette within normal limits.",
+    "flagged_hallucinations": [
+      "pneumothorax"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/dcfeeac4-1597e318-d0e6736a-8b2c2238-47ac3f1b.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Median sternotomy closure wires intact from prior CABG. No acute cardiopulmonary findings. Clear bilateral lung fields.",
+    "rejected": "Median sternotomy closure wires intact from prior CABG. No acute cardiopulmonary findings. Clear bilateral lung fields. Linear band-like atelectasis noted in the left retrocardiac space.",
+    "flagged_hallucinations": [
+      "atelectasis"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/b79e55c3-735ce5ac-64412506-cdc9ea79-f1af521f.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Peripherally inserted central catheter terminating in superior vena cava caviatrial junction. Lungs are clear.",
+    "rejected": "Peripherally inserted central catheter terminating in superior vena cava caviatrial junction. Lungs are clear. Cardiomegaly is moderately pronounced with prominent cardiomediastinal contour widening.",
+    "flagged_hallucinations": [
+      "cardiomegaly"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/096052b7-d256dc40-453a102b-fa7d01c6-1b22c6b4.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Healed right rib fracture. Clear lung parenchyma without pneumothorax or pleural effusion.",
+    "rejected": "Healed right rib fracture. Clear lung parenchyma small right apical pneumothorax is identified or pleural effusion.",
+    "flagged_hallucinations": [
+      "pneumothorax"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/f3e86afd-437eb86e-0f9bafb8-1e0f6f96-084ac17e.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "The lungs are clear bilaterally without focal consolidation, pneumothorax, or pleural effusion. Normal cardiac silhouette.",
+    "rejected": "The lungs are clear bilaterally focal dense airspace consolidation in the right midlung, pneumothorax, or pleural effusion. Normal cardiac silhouette.",
+    "flagged_hallucinations": [
+      "consolidation"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/28fad2ac-d6001216-b4f72c5b-2d4d452e-17b6c9a5.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Moderate cardiomegaly. Prominent pulmonary vascular congestion consistent with congestive heart failure. No acute focal pneumonia.",
+    "rejected": "Moderate cardiomegaly. Prominent pulmonary vascular congestion consistent with congestive heart failure. No acute focal pneumonia. Questionable foreign radiopaque density projected over the left hemithorax.",
+    "flagged_hallucinations": [
+      "support_devices"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/5cae71aa-99bb4662-41ef629e-7e89308c-5831ff9c.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Dense airspace consolidation in the right lower lobe consistent with acute pneumonia. Left lung is well expanded and clear.",
+    "rejected": "Dense airspace consolidation in the right lower lobe consistent with acute pneumonia. Left lung is well expanded and clear. Moderate blunting of the right costophrenic angle indicates a layered pleural effusion.",
+    "flagged_hallucinations": [
+      "pleural_effusion"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/dcfeeac4-1597e318-d0e6736a-8b2c2238-47ac3f1b.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Small apical pneumothorax is seen on the right with pleural line separation. Left lung field is clear without acute abnormality.",
+    "rejected": "Small apical pneumothorax is seen on the right with pleural line separation. Left lung field is clear without acute abnormality. Diffuse interstitial opacities with peribronchial cuffing reflecting moderate pulmonary vascular congestion.",
+    "flagged_hallucinations": [
+      "edema"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/b79e55c3-735ce5ac-64412506-cdc9ea79-f1af521f.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Bilateral pleural effusions with costophrenic angle blunting. Mild interstitial pulmonary edema. Heart size is mildly enlarged.",
+    "rejected": "Bilateral pleural effusions with costophrenic angle blunting. Mild interstitial pulmonary edema. Heart size is mildly enlarged. Dense patchy opacities in the bilateral lung bases suspicious for active multifocal pneumonia.",
+    "flagged_hallucinations": [
+      "pneumonia"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/096052b7-d256dc40-453a102b-fa7d01c6-1b22c6b4.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Right subclavian dual-chamber pacemaker in stable anatomical position with leads terminating in right atrium and ventricle. Lungs clear.",
+    "rejected": "Right subclavian dual-chamber pacemaker in stable anatomical position with leads terminating in right atrium and ventricle. Lungs clear. Dense patchy opacities in the bilateral lung bases suspicious for active multifocal pneumonia.",
+    "flagged_hallucinations": [
+      "pneumonia"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/f3e86afd-437eb86e-0f9bafb8-1e0f6f96-084ac17e.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Bibasilar atelectasis noted. No pneumothorax. Cardiomediastinal silhouette within normal limits.",
+    "rejected": "Bibasilar atelectasis noted. small right apical pneumothorax is identified. Cardiomediastinal silhouette within normal limits.",
+    "flagged_hallucinations": [
+      "pneumothorax"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/28fad2ac-d6001216-b4f72c5b-2d4d452e-17b6c9a5.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Median sternotomy closure wires intact from prior CABG. No acute cardiopulmonary findings. Clear bilateral lung fields.",
+    "rejected": "Median sternotomy closure wires intact from prior CABG. No acute cardiopulmonary findings. Clear bilateral lung fields. Small apical pneumothorax is identified on the right measuring approximately 1.5 cm.",
+    "flagged_hallucinations": [
+      "pneumothorax"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10001038/5cae71aa-99bb4662-41ef629e-7e89308c-5831ff9c.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Peripherally inserted central catheter terminating in superior vena cava caviatrial junction. Lungs are clear.",
+    "rejected": "Peripherally inserted central catheter terminating in superior vena cava caviatrial junction. Lungs are clear. Cardiomegaly is moderately pronounced with prominent cardiomediastinal contour widening.",
+    "flagged_hallucinations": [
+      "cardiomegaly"
+    ]
+  },
+  {
+    "image_path": "../clinixvault/data/p10000764/dcfeeac4-1597e318-d0e6736a-8b2c2238-47ac3f1b.jpg",
+    "prompt": "Describe the clinical findings in this chest X-ray.",
+    "chosen": "Healed right rib fracture. Clear lung parenchyma without pneumothorax or pleural effusion.",
+    "rejected": "Healed right rib fracture. Clear lung parenchyma small right apical pneumothorax is identified or pleural effusion.",
+    "flagged_hallucinations": [
+      "pneumothorax"
+    ]
+  }
+]

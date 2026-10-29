@@ -1,0 +1,282 @@
+# ==============================================================================
+# ClinixVault Prometheus & Grafana Alloy Telemetry Agent Manifests
+# Scrapes Gateway and Microservices, forwards Prometheus Metrics & Loki Logs to Grafana Cloud
+# ==============================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: clinixvault-alloy-config
+  namespace: clinixvault
+data:
+  config.alloy: |
+    // --------------------------------------------------------------------------
+    // 1. Prometheus In-Cluster Scrape Pipeline
+    // --------------------------------------------------------------------------
+
+    // API Gateway Scrape (:8000)
+    prometheus.scrape "clinixvault_gateway" {
+      targets = [{
+        __address__ = "clinixvault-gateway:8000",
+        job         = "clinixvault-gateway",
+        service     = "gateway",
+        environment = "k8s-production",
+        instance    = "clinixvault-k8s-node",
+      }]
+      metrics_path    = "/metrics"
+      scrape_interval = "15s"
+      scrape_timeout  = "10s"
+      forward_to      = [prometheus.remote_write.grafanacloud.receiver]
+    }
+
+    // VLM Vision Server (:8001)
+    prometheus.scrape "clinixvault_vlm" {
+      targets = [{
+        __address__ = "clinixvault-vlm:8001",
+        job         = "clinixvault-vlm",
+        service     = "vlm-server",
+        environment = "k8s-production",
+        instance    = "clinixvault-k8s-node",
+      }]
+      metrics_path    = "/metrics"
+      scrape_interval = "15s"
+      scrape_timeout  = "10s"
+      forward_to      = [prometheus.remote_write.grafanacloud.receiver]
+    }
+
+    // LLM Scribe & Summarization Server (:8002)
+    prometheus.scrape "clinixvault_llm" {
+      targets = [{
+        __address__ = "clinixvault-llm:8002",
+        job         = "clinixvault-llm",
+        service     = "llm-server",
+        environment = "k8s-production",
+        instance    = "clinixvault-k8s-node",
+      }]
+      metrics_path    = "/metrics"
+      scrape_interval = "15s"
+      scrape_timeout  = "10s"
+      forward_to      = [prometheus.remote_write.grafanacloud.receiver]
+    }
+
+    // Audio Whisper ASR Server (:8003)
+    prometheus.scrape "clinixvault_audio" {
+      targets = [{
+        __address__ = "clinixvault-audio:8003",
+        job         = "clinixvault-audio",
+        service     = "audio-server",
+        environment = "k8s-production",
+        instance    = "clinixvault-k8s-node",
+      }]
+      metrics_path    = "/metrics"
+      scrape_interval = "15s"
+      scrape_timeout  = "10s"
+      forward_to      = [prometheus.remote_write.grafanacloud.receiver]
+    }
+
+    // Document OCR Server (:8004)
+    prometheus.scrape "clinixvault_document" {
+      targets = [{
+        __address__ = "clinixvault-document:8004",
+        job         = "clinixvault-document",
+        service     = "document-server",
+        environment = "k8s-production",
+        instance    = "clinixvault-k8s-node",
+      }]
+      metrics_path    = "/metrics"
+      scrape_interval = "15s"
+      scrape_timeout  = "10s"
+      forward_to      = [prometheus.remote_write.grafanacloud.receiver]
+    }
+
+    // Prometheus Remote Write to Grafana Cloud Prometheus
+    prometheus.remote_write "grafanacloud" {
+      endpoint {
+        url = sys.env("GRAFANA_CLOUD_PROMETHEUS_URL")
+
+        basic_auth {
+          username = sys.env("GRAFANA_CLOUD_PROMETHEUS_USER")
+          password = sys.env("GRAFANA_CLOUD_API_TOKEN")
+        }
+
+        queue_config {
+          capacity             = 5000
+          max_shards           = 10
+          max_samples_per_send = 500
+          batch_send_deadline  = "5s"
+        }
+      }
+    }
+
+    // --------------------------------------------------------------------------
+    // 2. Structured Log Streaming Pipeline to Grafana Cloud Loki
+    // --------------------------------------------------------------------------
+
+    local.file_match "clinixvault_logs" {
+      path_targets = [{
+        __path__    = "/var/log/clinixvault/*.log",
+        job         = "clinixvault",
+        app         = "clinixvault-edge",
+        environment = "k8s-production",
+        instance    = "clinixvault-k8s-pod",
+      }]
+    }
+
+    loki.source.file "clinixvault_files" {
+      targets    = local.file_match.clinixvault_logs.targets
+      forward_to = [loki.process.clinixvault_json.receiver]
+    }
+
+    loki.process "clinixvault_json" {
+      stage.json {
+        expressions = {
+          timestamp   = "timestamp",
+          level       = "level",
+          logger      = "logger",
+          module      = "module",
+          service     = "service",
+          status_code = "status_code",
+          method      = "method",
+          path        = "path",
+          patient_id  = "patient_id",
+          request_id  = "request_id",
+          duration_ms = "duration_ms",
+          message     = "message",
+        }
+      }
+
+      stage.labels {
+        values = {
+          level       = "level",
+          logger      = "logger",
+          service     = "service",
+          status_code = "status_code",
+          method      = "method",
+        }
+      }
+
+      stage.timestamp {
+        source = "timestamp"
+        format = "RFC3339"
+      }
+
+      forward_to = [loki.write.grafanacloud.receiver]
+    }
+
+    loki.write "grafanacloud" {
+      endpoint {
+        url = sys.env("GRAFANA_CLOUD_LOKI_URL")
+
+        basic_auth {
+          username = sys.env("GRAFANA_CLOUD_LOKI_USER")
+          password = sys.env("GRAFANA_CLOUD_API_TOKEN")
+        }
+
+        batch_wait = "1s"
+        batch_size = "100KiB"
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clinixvault-alloy
+  namespace: clinixvault
+  labels:
+    app: clinixvault-alloy
+    role: observability
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: clinixvault-alloy
+  template:
+    metadata:
+      labels:
+        app: clinixvault-alloy
+    spec:
+      containers:
+        - name: alloy
+          image: grafana/alloy:v1.7.5
+          imagePullPolicy: IfNotPresent
+          args:
+            - run
+            - --server.http.listen-addr=0.0.0.0:12345
+            - /etc/alloy/config.alloy
+          ports:
+            - containerPort: 12345
+              name: http
+          env:
+            - name: GRAFANA_CLOUD_PROMETHEUS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: clinixvault-secrets
+                  key: GRAFANA_CLOUD_PROMETHEUS_URL
+            - name: GRAFANA_CLOUD_PROMETHEUS_USER
+              valueFrom:
+                secretKeyRef:
+                  name: clinixvault-secrets
+                  key: GRAFANA_CLOUD_PROMETHEUS_USER
+            - name: GRAFANA_CLOUD_LOKI_URL
+              valueFrom:
+                secretKeyRef:
+                  name: clinixvault-secrets
+                  key: GRAFANA_CLOUD_LOKI_URL
+            - name: GRAFANA_CLOUD_LOKI_USER
+              valueFrom:
+                secretKeyRef:
+                  name: clinixvault-secrets
+                  key: GRAFANA_CLOUD_LOKI_USER
+            - name: GRAFANA_CLOUD_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: clinixvault-secrets
+                  key: GRAFANA_CLOUD_API_TOKEN
+          volumeMounts:
+            - name: alloy-config
+              mountPath: /etc/alloy/config.alloy
+              subPath: config.alloy
+            - name: logs-storage
+              mountPath: /var/log/clinixvault
+              readOnly: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          readinessProbe:
+            httpGet:
+              path: /-/ready
+              port: 12345
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /-/healthy
+              port: 12345
+            initialDelaySeconds: 15
+            periodSeconds: 20
+      volumes:
+        - name: alloy-config
+          configMap:
+            name: clinixvault-alloy-config
+        - name: logs-storage
+          persistentVolumeClaim:
+            claimName: logs-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: clinixvault-alloy
+  namespace: clinixvault
+  labels:
+    app: clinixvault-alloy
+spec:
+  selector:
+    app: clinixvault-alloy
+  ports:
+    - port: 12345
+      targetPort: 12345
+      name: http

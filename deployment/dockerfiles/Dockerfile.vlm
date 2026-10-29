@@ -1,0 +1,74 @@
+# ==============================================================================
+# Multi-Stage Dockerfile for ClinixVault VLM Radiology Server
+# Stage 1: Build virtual environment, install PyTorch/Transformers, compile C++ kernels
+# Stage 2: Hardened, non-root minimal runtime image with healthcheck probe
+# ==============================================================================
+
+# ----------------- Stage 1: Build & Compilation Stage -----------------
+FROM python:3.11-slim AS builder
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    git \
+    libgl1 \
+    libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir \
+    torch torchvision --index-url https://download.pytorch.org/whl/cpu && \
+    pip install --no-cache-dir \
+    fastapi>=0.110.0 \
+    uvicorn>=0.28.0 \
+    pydantic>=2.6.0 \
+    transformers>=4.45.0 \
+    peft>=0.12.0 \
+    pillow>=10.2.0 \
+    psutil>=5.9.8 \
+    numpy>=1.26.0 \
+    timm>=0.9.12 \
+    einops>=0.7.0 \
+    pydicom>=2.4.4
+
+COPY inference/cpp /app/inference/cpp
+RUN cd /app/inference/cpp && make clean && make
+
+# ----------------- Stage 2: Production Runtime Stage -----------------
+FROM python:3.11-slim AS runner
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgl1 \
+    libglib2.0-0 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN groupadd -g 10001 clinix && \
+    useradd -u 10001 -g clinix -s /bin/bash -m appuser
+
+COPY --from=builder /opt/venv /opt/venv
+COPY --from=builder /app/inference/cpp /app/inference/cpp
+
+ENV PATH="/opt/venv/bin:$PATH"
+ENV PYTHONPATH=/app
+
+COPY inference/vlm_server /app/inference/vlm_server
+COPY inference/shared /app/inference/shared
+
+RUN chown -R appuser:clinix /app
+
+USER appuser
+
+EXPOSE 8001
+
+HEALTHCHECK --interval=20s --timeout=5s --start-period=15s --retries=3 \
+    CMD curl -f http://localhost:8001/health || exit 1
+
+CMD ["uvicorn", "inference.vlm_server.server:app", "--host", "0.0.0.0", "--port", "8001"]

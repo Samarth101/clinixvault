@@ -1,0 +1,28 @@
+services:
+  alloy:
+    image: grafana/alloy:v1.7.5
+    container_name: clinixvault_alloy
+    restart: unless-stopped
+    ports:
+      - "12345:12345"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - GRAFANA_CLOUD_PROMETHEUS_URL=${GRAFANA_CLOUD_PROMETHEUS_URL}
+      - GRAFANA_CLOUD_PROMETHEUS_USER=${GRAFANA_CLOUD_PROMETHEUS_USER}
+      - GRAFANA_CLOUD_LOKI_URL=${GRAFANA_CLOUD_LOKI_URL}
+      - GRAFANA_CLOUD_LOKI_USER=${GRAFANA_CLOUD_LOKI_USER}
+      - GRAFANA_CLOUD_API_TOKEN=${GRAFANA_CLOUD_API_TOKEN}
+      - GATEWAY_METRICS_TARGET=host.docker.internal:8000
+      - VLM_METRICS_TARGET=host.docker.internal:8001
+      - LLM_METRICS_TARGET=host.docker.internal:8002
+      - AUDIO_METRICS_TARGET=host.docker.internal:8003
+      - DOCUMENT_METRICS_TARGET=host.docker.internal:8004
+    volumes:
+      - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - ../logs:/var/log/clinixvault:ro
+      - ../logs:/Users/samarthbhandegaonkar/Desktop/clinixvault/logs:ro
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - /etc/alloy/config.alloy

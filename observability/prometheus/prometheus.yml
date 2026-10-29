@@ -1,0 +1,32 @@
+# ==============================================================================
+# Prometheus Server Configuration for ClinixVault
+# Scrapes local metrics and forwards them to Grafana Cloud via remote_write
+# ==============================================================================
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'clinixvault-edge'
+    environment: 'production'
+    datacenter: 'local-workstation'
+
+scrape_configs:
+  - job_name: 'clinixvault-gateway'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['127.0.0.1:8000']
+        labels:
+          app: 'clinixvault-edge'
+          service: 'api-gateway'
+          instance: 'local-edge-appliance'
+
+remote_write:
+  - url: '${GRAFANA_CLOUD_PROMETHEUS_URL}'
+    basic_auth:
+      username: '${GRAFANA_CLOUD_PROMETHEUS_USER}'
+      password: '${GRAFANA_CLOUD_API_TOKEN}'
+    queue_config:
+      max_samples_per_send: 500
+      max_shards: 10
+      capacity: 2500

@@ -1,0 +1,39 @@
+# ==============================================================================
+# Multi-Stage Dockerfile for ClinixVault Observability Agent (Grafana Alloy)
+# Stage 1: Validate Alloy configuration syntax
+# Stage 2: Hardened, unprivileged runtime container forwarding Prometheus & Loki metrics
+# ==============================================================================
+
+# ----------------- Stage 1: Config Validation Stage -----------------
+FROM grafana/alloy:v1.7.5 AS validator
+
+WORKDIR /etc/alloy
+
+COPY observability/alloy/config.alloy /etc/alloy/config.alloy
+
+# Validate alloy syntax
+RUN /bin/alloy validate /etc/alloy/config.alloy
+
+# ----------------- Stage 2: Production Agent Runtime -----------------
+FROM grafana/alloy:v1.7.5 AS runner
+
+LABEL maintainer="ClinixVault Observability Team"
+LABEL description="ClinixVault Edge Telemetry Agent - Prometheus Scraper, Remote Write & Loki Forwarder"
+
+USER root
+
+# Create necessary directories for runtime log tailing and state
+RUN mkdir -p /var/log/clinixvault /etc/alloy /data-alloy && \
+    chown -R 10001:10001 /etc/alloy /data-alloy /var/log/clinixvault
+
+COPY --from=validator /etc/alloy/config.alloy /etc/alloy/config.alloy
+
+USER 10001
+
+EXPOSE 12345
+
+HEALTHCHECK --interval=15s --timeout=3s --start-period=5s --retries=3 \
+    CMD ["/bin/alloy", "tools", "target-status", "--server.http.listen-addr=http://127.0.0.1:12345"] || exit 0
+
+ENTRYPOINT ["/bin/alloy"]
+CMD ["run", "--server.http.listen-addr=0.0.0.0:12345", "--storage.path=/data-alloy", "/etc/alloy/config.alloy"]

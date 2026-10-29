@@ -1,0 +1,195 @@
+// ==============================================================================
+// Grafana Alloy Configuration for ClinixVault Edge Telemetry
+// Scrapes Prometheus metrics across all microservices and streams structured logs
+// to Grafana Labs (Grafana Cloud)
+// ==============================================================================
+
+// ------------------------------------------------------------------------------
+// 1. PROMETHEUS METRICS SCRAPING PIPELINE
+// ------------------------------------------------------------------------------
+
+// API Gateway Scrape
+prometheus.scrape "clinixvault_gateway" {
+  targets = [{
+    __address__ = sys.env("GATEWAY_METRICS_TARGET"),
+    job         = "clinixvault-gateway",
+    service     = "gateway",
+    environment = "edge-production",
+    instance    = "clinixvault-apple-silicon",
+  }]
+
+  metrics_path    = "/metrics"
+  scrape_interval = "15s"
+  scrape_timeout  = "10s"
+
+  forward_to = [prometheus.remote_write.grafanacloud.receiver]
+}
+
+// VLM Vision Server Scrape (:8001)
+prometheus.scrape "clinixvault_vlm" {
+  targets = [{
+    __address__ = sys.env("VLM_METRICS_TARGET"),
+    job         = "clinixvault-vlm",
+    service     = "vlm-server",
+    environment = "edge-production",
+    instance    = "clinixvault-apple-silicon",
+  }]
+
+  metrics_path    = "/metrics"
+  scrape_interval = "15s"
+  scrape_timeout  = "10s"
+
+  forward_to = [prometheus.remote_write.grafanacloud.receiver]
+}
+
+// LLM Scribe & Summarization Server Scrape (:8002)
+prometheus.scrape "clinixvault_llm" {
+  targets = [{
+    __address__ = sys.env("LLM_METRICS_TARGET"),
+    job         = "clinixvault-llm",
+    service     = "llm-server",
+    environment = "edge-production",
+    instance    = "clinixvault-apple-silicon",
+  }]
+
+  metrics_path    = "/metrics"
+  scrape_interval = "15s"
+  scrape_timeout  = "10s"
+
+  forward_to = [prometheus.remote_write.grafanacloud.receiver]
+}
+
+// Audio Whisper ASR Server Scrape (:8003)
+prometheus.scrape "clinixvault_audio" {
+  targets = [{
+    __address__ = sys.env("AUDIO_METRICS_TARGET"),
+    job         = "clinixvault-audio",
+    service     = "audio-server",
+    environment = "edge-production",
+    instance    = "clinixvault-apple-silicon",
+  }]
+
+  metrics_path    = "/metrics"
+  scrape_interval = "15s"
+  scrape_timeout  = "10s"
+
+  forward_to = [prometheus.remote_write.grafanacloud.receiver]
+}
+
+// Document AI OCR Server Scrape (:8004)
+prometheus.scrape "clinixvault_document" {
+  targets = [{
+    __address__ = sys.env("DOCUMENT_METRICS_TARGET"),
+    job         = "clinixvault-document",
+    service     = "document-server",
+    environment = "edge-production",
+    instance    = "clinixvault-apple-silicon",
+  }]
+
+  metrics_path    = "/metrics"
+  scrape_interval = "15s"
+  scrape_timeout  = "10s"
+
+  forward_to = [prometheus.remote_write.grafanacloud.receiver]
+}
+
+// Prometheus Remote Write to Grafana Cloud
+prometheus.remote_write "grafanacloud" {
+  endpoint {
+    url = sys.env("GRAFANA_CLOUD_PROMETHEUS_URL")
+
+    basic_auth {
+      username = sys.env("GRAFANA_CLOUD_PROMETHEUS_USER")
+      password = sys.env("GRAFANA_CLOUD_API_TOKEN")
+    }
+
+    queue_config {
+      capacity             = 5000
+      max_shards           = 10
+      max_samples_per_send = 500
+      batch_send_deadline  = "5s"
+    }
+  }
+}
+
+// ------------------------------------------------------------------------------
+// 2. LOKI LOGS STREAMING PIPELINE
+// ------------------------------------------------------------------------------
+
+local.file_match "clinixvault_logs" {
+  path_targets = [
+    {
+      __path__    = "/Users/samarthbhandegaonkar/Desktop/clinixvault/logs/*.log",
+      job         = "clinixvault",
+      app         = "clinixvault-edge",
+      environment = "edge-production",
+      instance    = "clinixvault-apple-silicon",
+    },
+    {
+      __path__    = "/var/log/clinixvault/*.log",
+      job         = "clinixvault",
+      app         = "clinixvault-edge",
+      environment = "edge-production",
+      instance    = "clinixvault-apple-silicon",
+    },
+  ]
+}
+
+loki.source.file "clinixvault_files" {
+  targets    = local.file_match.clinixvault_logs.targets
+  forward_to = [loki.process.clinixvault_json.receiver]
+}
+
+loki.process "clinixvault_json" {
+  // Extract structured JSON fields emitted by inference/shared/logger.py
+  stage.json {
+    expressions = {
+      timestamp   = "timestamp",
+      level       = "level",
+      logger      = "logger",
+      module      = "module",
+      service     = "service",
+      status_code = "status_code",
+      method      = "method",
+      path        = "path",
+      client_ip   = "client_ip",
+      patient_id  = "patient_id",
+      request_id  = "request_id",
+      duration_ms = "duration_ms",
+      message     = "message",
+    }
+  }
+
+  // Promote key query dimensions into indexed Loki stream labels
+  stage.labels {
+    values = {
+      level       = "level",
+      logger      = "logger",
+      service     = "service",
+      status_code = "status_code",
+      method      = "method",
+    }
+  }
+
+  // Align log entry time with event creation time
+  stage.timestamp {
+    source = "timestamp"
+    format = "RFC3339"
+  }
+
+  forward_to = [loki.write.grafanacloud.receiver]
+}
+
+loki.write "grafanacloud" {
+  endpoint {
+    url = sys.env("GRAFANA_CLOUD_LOKI_URL")
+
+    basic_auth {
+      username = sys.env("GRAFANA_CLOUD_LOKI_USER")
+      password = sys.env("GRAFANA_CLOUD_API_TOKEN")
+    }
+
+    batch_wait = "1s"
+    batch_size = "100KiB"
+  }
+}

@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: clinixvault
+  labels:
+    app.kubernetes.io/name: clinixvault
+    app.kubernetes.io/part-of: edge-clinical-appliance
