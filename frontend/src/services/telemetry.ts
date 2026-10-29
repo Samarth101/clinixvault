@@ -4,7 +4,8 @@
  * to the API Gateway for Prometheus & Grafana Cloud ingestion.
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+const rawApiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+const API_BASE_URL = (rawApiUrl || '').replace(/\/+$/, '');
 
 export interface TelemetryEventPayload {
   event_type: 'button_click' | 'page_view' | 'modal_open' | 'action';

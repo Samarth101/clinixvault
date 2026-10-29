@@ -24,12 +24,14 @@ import {
 
 export type { PatientDetailResponse, ClinicalReportItem } from '../types';
 
-const API_BASE_URL =
+const rawUrl =
   import.meta.env.VITE_API_URL !== undefined
     ? import.meta.env.VITE_API_URL
     : import.meta.env.DEV
     ? 'http://127.0.0.1:8000'
     : '';
+
+const API_BASE_URL = (rawUrl || '').replace(/\/+$/, '');
 
 export function getScribeWsUrl(): string {
   if (typeof window === 'undefined') return 'ws://127.0.0.1:8000/api/v1/scribe/stream';

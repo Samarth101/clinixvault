@@ -344,3 +344,23 @@ def get_prometheus_metrics_response() -> Response:
     """
     payload = generate_prometheus_metrics()
     return Response(content=payload, media_type="text/plain; version=0.0.4; charset=utf-8")
+
+
+class ClinixVaultMetricsCollector:
+    """Unified metrics collector bridge for external monitors and Colab GPU watchdog."""
+    def record_request(self, method: str, path: str, status_code: int, duration: float) -> None:
+        record_request_metrics(method, path, status_code, duration)
+
+    def record_inference(
+        self, service: str, model: str, task: str, status: str, duration: float, tokens: int = 0
+    ) -> None:
+        record_inference_metrics(service, model, task, status, duration, tokens)
+
+    def update_health(self, service: str, is_healthy: bool) -> None:
+        update_microservice_health(service, is_healthy)
+
+    def update_memory(self, service: str, memory_bytes: int) -> None:
+        update_microservice_memory(service, memory_bytes)
+
+
+metrics_collector = ClinixVaultMetricsCollector()
