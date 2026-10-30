@@ -4,8 +4,7 @@
  * to the API Gateway for Prometheus & Grafana Cloud ingestion.
  */
 
-const rawApiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
-const API_BASE_URL = (rawApiUrl || '').replace(/\/+$/, '');
+import { getApiBaseUrl } from './api';
 
 export interface TelemetryEventPayload {
   event_type: 'button_click' | 'page_view' | 'modal_open' | 'action';
@@ -68,14 +67,15 @@ class TelemetryService {
     this.queue = [];
 
     try {
+      const baseUrl = getApiBaseUrl();
       if (eventsToSend.length === 1) {
-        await fetch(`${API_BASE_URL}/api/v1/telemetry/event`, {
+        await fetch(`${baseUrl}/api/v1/telemetry/event`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(eventsToSend[0]),
         });
       } else {
-        await fetch(`${API_BASE_URL}/api/v1/telemetry/batch`, {
+        await fetch(`${baseUrl}/api/v1/telemetry/batch`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ events: eventsToSend }),

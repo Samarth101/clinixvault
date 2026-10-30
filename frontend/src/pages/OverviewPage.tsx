@@ -38,6 +38,7 @@ import { PageId, EncounterSummary, PatientReport, HardwareSpecs, SpeakerTurn } f
 import { useAuth } from '../context/useAuth';
 import { clinixApi, ClinicalInteractionAlert, CodingExtractionResponse } from '../services/api';
 import { MedicalKeywordHighlighter } from '../components/MedicalKeywordHighlighter';
+import { formatISTTime, formatISTDate, formatISTDateTime } from '../utils/time';
 import { PatientReportView } from '../components/PatientReportView';
 import { ClinicVaultLogoSVG } from '../components/ClinicVaultLogoSVG';
 
@@ -82,11 +83,11 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
   });
 
   const [transcriptTurns, setTranscriptTurns] = useState<SpeakerTurn[]>([]);
-  const transcriptEndRef = useRef<HTMLDivElement>(null);
+  const transcriptContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (transcriptTurns.length > 0) {
-      transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (transcriptTurns.length > 0 && transcriptContainerRef.current) {
+      transcriptContainerRef.current.scrollTop = transcriptContainerRef.current.scrollHeight;
     }
   }, [transcriptTurns.length]);
 
@@ -283,9 +284,14 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
     };
     void fetchTelemetry();
     const interval = setInterval(fetchTelemetry, 3000);
+    const handleBackendChange = () => {
+      void fetchTelemetry();
+    };
+    window.addEventListener('clinixvault:backend_changed', handleBackendChange);
     return () => {
       isMounted = false;
       clearInterval(interval);
+      window.removeEventListener('clinixvault:backend_changed', handleBackendChange);
     };
   }, []);
 
@@ -321,7 +327,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
             chiefComplaint: enc?.chief_complaint || 'Clinical evaluation',
             examRoom: enc?.exam_room || 'Exam Room 1',
             status: (enc?.status === 'completed' ? 'Committed' : (enc?.status === 'in_progress' ? 'In Progress' : 'Ready for Review')) as EncounterSummary['status'],
-            timestamp: enc?.started_at ? new Date(enc.started_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '10:00 AM',
+            timestamp: enc?.started_at ? formatISTTime(enc.started_at) : '10:00 AM IST',
             vitals: {
               bp: vit?.bp || '120/80',
               hr: vit?.hr ? String(vit.hr) : '72',
@@ -505,7 +511,7 @@ CLINIXVAULT INSTITUTIONAL CLINICAL ENCOUNTER
 ================================================
 Patient: ${enc?.patientName || 'Registered Patient'}
 MRN: ${enc?.mrn || 'N/A'} | DOB: ${enc?.dob || 'N/A'}
-Date: ${new Date().toLocaleDateString()} | Room: ${enc?.examRoom || 'Exam Room'}
+Date: ${formatISTDate(new Date())} | Room: ${enc?.examRoom || 'Exam Room'}
 Attending Clinician: ${currentUser.name}
 ------------------------------------------------
 VITALS:
@@ -989,7 +995,10 @@ HIPAA Security Rule §164.312 Integrity Mechanism Certified
           </div>
 
           {/* Transcript Scroll Area with dynamic expansion */}
-          <div className="flex-1 overflow-y-auto pr-2 space-y-4 min-h-[480px] max-h-[82vh] flex flex-col scroll-smooth">
+          <div 
+            ref={transcriptContainerRef}
+            className="flex-1 overflow-y-auto pr-2 space-y-4 min-h-[480px] max-h-[82vh] flex flex-col scroll-smooth"
+          >
             {transcriptTurns.length === 0 ? (
               <div className="flex-1 flex flex-col items-center justify-center p-8 rounded-2xl bg-slate-50/70 dark:bg-slate-900/30 border border-dashed border-slate-200 dark:border-slate-800 text-center space-y-3.5 my-auto">
                 <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-950/60 text-clinical-blue mx-auto flex items-center justify-center font-bold shadow-xs">
@@ -1063,7 +1072,6 @@ HIPAA Security Rule §164.312 Integrity Mechanism Certified
                     </motion.div>
                   );
                 })}
-                <div ref={transcriptEndRef} />
               </>
             )}
           </div>

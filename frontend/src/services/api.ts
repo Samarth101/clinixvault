@@ -24,23 +24,41 @@ import {
 
 export type { PatientDetailResponse, ClinicalReportItem } from '../types';
 
-const rawUrl =
-  import.meta.env.VITE_API_URL !== undefined
-    ? import.meta.env.VITE_API_URL
-    : import.meta.env.DEV
-    ? 'http://127.0.0.1:8000'
-    : '';
+export function getApiBaseUrl(): string {
+  if (typeof window !== 'undefined') {
+    const saved = localStorage.getItem('clinixvault_api_url');
+    if (saved && saved.trim()) {
+      return saved.trim().replace(/\/+$/, '');
+    }
+  }
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (envUrl !== undefined && envUrl !== '') {
+    return envUrl.trim().replace(/\/+$/, '');
+  }
+  return import.meta.env.DEV ? 'http://127.0.0.1:8000' : '';
+}
 
-const API_BASE_URL = (rawUrl || '').replace(/\/+$/, '');
+export function setApiBaseUrl(url: string): void {
+  const clean = (url || '').trim().replace(/\/+$/, '');
+  if (typeof window !== 'undefined') {
+    if (clean) {
+      localStorage.setItem('clinixvault_api_url', clean);
+    } else {
+      localStorage.removeItem('clinixvault_api_url');
+    }
+    window.dispatchEvent(new CustomEvent('clinixvault:backend_changed', { detail: { url: clean } }));
+  }
+}
 
 export function getScribeWsUrl(): string {
   if (typeof window === 'undefined') return 'ws://127.0.0.1:8000/api/v1/scribe/stream';
+  const base = getApiBaseUrl();
   
-  if (API_BASE_URL.startsWith('http://')) {
-    return API_BASE_URL.replace('http://', 'ws://') + '/api/v1/scribe/stream';
+  if (base.startsWith('http://')) {
+    return base.replace('http://', 'ws://') + '/api/v1/scribe/stream';
   }
-  if (API_BASE_URL.startsWith('https://')) {
-    return API_BASE_URL.replace('https://', 'wss://') + '/api/v1/scribe/stream';
+  if (base.startsWith('https://')) {
+    return base.replace('https://', 'wss://') + '/api/v1/scribe/stream';
   }
   
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -289,7 +307,7 @@ export function extractDynamicPathologies(findings: string, impression: string):
 
 export const clinixApi = {
   getBaseUrl(): string {
-    return API_BASE_URL;
+    return getApiBaseUrl();
   },
 
   /**
@@ -297,7 +315,7 @@ export const clinixApi = {
    */
   async getHardwareSpecs(): Promise<HardwareSpecs> {
     try {
-      const resp = await fetch(`${API_BASE_URL}/api/v1/system/hardware`, {
+      const resp = await fetch(`${getApiBaseUrl()}/api/v1/system/hardware`, {
         headers: { Accept: 'application/json' },
       });
       if (resp.ok) {
@@ -329,7 +347,7 @@ export const clinixApi = {
    */
   async getModelList(): Promise<ModelListResponse> {
     try {
-      const resp = await fetch(`${API_BASE_URL}/api/v1/models/list`, {
+      const resp = await fetch(`${getApiBaseUrl()}/api/v1/models/list`, {
         headers: { Accept: 'application/json' },
       });
       if (resp.ok) {
@@ -411,7 +429,7 @@ export const clinixApi = {
    * Trigger model download from Ollama library
    */
   async pullModel(model: string): Promise<{ status: string; model: string; message: string }> {
-    const resp = await fetch(`${API_BASE_URL}/api/v1/models/pull`, {
+    const resp = await fetch(`${getApiBaseUrl()}/api/v1/models/pull`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model }),
@@ -427,7 +445,7 @@ export const clinixApi = {
    */
   async getModelPullStatus(): Promise<ModelPullStatus> {
     try {
-      const resp = await fetch(`${API_BASE_URL}/api/v1/models/status`, {
+      const resp = await fetch(`${getApiBaseUrl()}/api/v1/models/status`, {
         headers: { Accept: 'application/json' },
       });
       if (resp.ok) {
@@ -459,7 +477,7 @@ export const clinixApi = {
     } else {
       body = { radiology_model: taskOrRad, summarize_model: modelOrSum };
     }
-    const resp = await fetch(`${API_BASE_URL}/api/v1/models/active`, {
+    const resp = await fetch(`${getApiBaseUrl()}/api/v1/models/active`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -481,7 +499,7 @@ export const clinixApi = {
    * Start local Ollama daemon
    */
   async startOllamaDaemon(): Promise<{ status: string; message: string; connected: boolean; version?: string }> {
-    const resp = await fetch(`${API_BASE_URL}/api/v1/models/ollama/start`, {
+    const resp = await fetch(`${getApiBaseUrl()}/api/v1/models/ollama/start`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
     });
@@ -495,7 +513,7 @@ export const clinixApi = {
    * Stop local Ollama runner and cleanly dismiss top menu bar icon
    */
   async stopOllamaDaemon(): Promise<{ status: string; message: string; connected: boolean; details?: string[] }> {
-    const resp = await fetch(`${API_BASE_URL}/api/v1/models/ollama/stop`, {
+    const resp = await fetch(`${getApiBaseUrl()}/api/v1/models/ollama/stop`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
     });
@@ -510,7 +528,7 @@ export const clinixApi = {
    */
   async warmupScribe(): Promise<{ status: string; is_loaded?: boolean; warmup_latency_ms?: number }> {
     try {
-      const resp = await fetch(`${API_BASE_URL}/api/v1/scribe/warmup`, {
+      const resp = await fetch(`${getApiBaseUrl()}/api/v1/scribe/warmup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
@@ -524,7 +542,7 @@ export const clinixApi = {
    * Run / preload a model in Ollama edge memory
    */
   async runOllamaModel(modelName: string): Promise<{ status: string; model: string; message: string }> {
-    const resp = await fetch(`${API_BASE_URL}/api/v1/models/ollama/run`, {
+    const resp = await fetch(`${getApiBaseUrl()}/api/v1/models/ollama/run`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model_name: modelName }),
@@ -540,7 +558,7 @@ export const clinixApi = {
    */
   async getOllamaStatus(): Promise<{ running: boolean; version: string | null; models: any[]; host: string }> {
     try {
-      const resp = await fetch(`${API_BASE_URL}/api/v1/models/ollama/status`, {
+      const resp = await fetch(`${getApiBaseUrl()}/api/v1/models/ollama/status`, {
         headers: { Accept: 'application/json' },
       });
       if (resp.ok) {
@@ -575,7 +593,7 @@ export const clinixApi = {
   }> {
     const startTime = performance.now();
     try {
-      const resp = await fetch(`${API_BASE_URL}/api/v1/summarize`, {
+      const resp = await fetch(`${getApiBaseUrl()}/api/v1/summarize`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -645,7 +663,7 @@ export const clinixApi = {
   }> {
     const startTime = performance.now();
     try {
-      const resp = await fetch(`${API_BASE_URL}/api/v1/summarize/document`, {
+      const resp = await fetch(`${getApiBaseUrl()}/api/v1/summarize/document`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -731,7 +749,7 @@ export const clinixApi = {
 
     const startTime = performance.now();
     try {
-      const resp = await fetch(`${API_BASE_URL}/api/v1/scribe/synthesize-soap`, {
+      const resp = await fetch(`${getApiBaseUrl()}/api/v1/scribe/synthesize-soap`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -801,7 +819,7 @@ export const clinixApi = {
     patientId?: string;
   }): Promise<ClinicalInteractionResponse> {
     try {
-      const resp = await fetch(`${API_BASE_URL}/api/v1/scribe/check-interactions`, {
+      const resp = await fetch(`${getApiBaseUrl()}/api/v1/scribe/check-interactions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -834,7 +852,7 @@ export const clinixApi = {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 2000);
 
-      const resp = await fetch(`${API_BASE_URL}/api/v1/health`, {
+      const resp = await fetch(`${getApiBaseUrl()}/api/v1/health`, {
         method: 'GET',
         headers: {
           Accept: 'application/json',
@@ -888,7 +906,7 @@ export const clinixApi = {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 45000);
 
-      const resp = await fetch(`${API_BASE_URL}/api/v1/radiology/generate`, {
+      const resp = await fetch(`${getApiBaseUrl()}/api/v1/radiology/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1007,7 +1025,7 @@ export const clinixApi = {
     criticAudit?: CriticAudit;
     projection?: string;
   }): Promise<Blob> {
-    const resp = await fetch(`${API_BASE_URL}/api/v1/radiology/export-dicom-sr`, {
+    const resp = await fetch(`${getApiBaseUrl()}/api/v1/radiology/export-dicom-sr`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1037,7 +1055,7 @@ export const clinixApi = {
     modelName?: string
   ): Promise<PatientReport> {
     try {
-      const resp = await fetch(`${API_BASE_URL}/api/v1/radiology/simplify`, {
+      const resp = await fetch(`${getApiBaseUrl()}/api/v1/radiology/simplify`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1098,7 +1116,7 @@ export const clinixApi = {
     encounterId?: string;
   }): Promise<CodingExtractionResponse> {
     try {
-      const resp = await fetch(`${API_BASE_URL}/api/v1/scribe/extract-codes`, {
+      const resp = await fetch(`${getApiBaseUrl()}/api/v1/scribe/extract-codes`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1183,7 +1201,7 @@ export const clinixApi = {
    */
   async getRealRadiologyCases(): Promise<any[]> {
     try {
-      const resp = await fetch(`${API_BASE_URL}/api/v1/radiology/cases?page=1&limit=30`);
+      const resp = await fetch(`${getApiBaseUrl()}/api/v1/radiology/cases?page=1&limit=30`);
       if (resp.ok) {
         const data = await resp.json();
         return data.cases || [];
@@ -1217,7 +1235,7 @@ export const clinixApi = {
       }
       if (projection && projection !== 'all') params.append('projection', projection);
 
-      const resp = await fetch(`${API_BASE_URL}/api/v1/radiology/cases?${params.toString()}`);
+      const resp = await fetch(`${getApiBaseUrl()}/api/v1/radiology/cases?${params.toString()}`);
       if (resp.ok) {
         return await resp.json();
       }
@@ -1237,7 +1255,7 @@ export const clinixApi = {
    */
   async getRadiologyCaseDetail(caseId: string): Promise<RadiologyCase | null> {
     try {
-      const resp = await fetch(`${API_BASE_URL}/api/v1/radiology/cases/${caseId}`);
+      const resp = await fetch(`${getApiBaseUrl()}/api/v1/radiology/cases/${caseId}`);
       if (resp.ok) {
         return await resp.json();
       }
@@ -1262,7 +1280,7 @@ export const clinixApi = {
     if (indication) formData.append('indication', indication);
     formData.append('projection', projection);
 
-    const resp = await fetch(`${API_BASE_URL}/api/v1/radiology/upload`, {
+    const resp = await fetch(`${getApiBaseUrl()}/api/v1/radiology/upload`, {
       method: 'POST',
       headers: {
         Authorization: 'Bearer vault-local-admin-token',
@@ -1284,7 +1302,7 @@ export const clinixApi = {
     modelName?: string
   ): Promise<PatientReport> {
     try {
-      const resp = await fetch(`${API_BASE_URL}/api/v1/summarize/patient`, {
+      const resp = await fetch(`${getApiBaseUrl()}/api/v1/summarize/patient`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1339,7 +1357,7 @@ export const clinixApi = {
    */
   async getGraphStats(): Promise<GraphStatsResponse> {
     try {
-      const resp = await fetch(`${API_BASE_URL}/api/v1/graph/stats`, {
+      const resp = await fetch(`${getApiBaseUrl()}/api/v1/graph/stats`, {
         headers: {
           Authorization: 'Bearer vault-local-admin-token',
         },
@@ -1365,7 +1383,7 @@ export const clinixApi = {
    */
   async getPatientGraph(patientId: string, depth = 2): Promise<PatientGraphResponse> {
     try {
-      const resp = await fetch(`${API_BASE_URL}/api/v1/graph/patient/${encodeURIComponent(patientId)}?depth=${depth}`, {
+      const resp = await fetch(`${getApiBaseUrl()}/api/v1/graph/patient/${encodeURIComponent(patientId)}?depth=${depth}`, {
         headers: {
           Authorization: 'Bearer vault-local-admin-token',
         },
@@ -1398,7 +1416,7 @@ export const clinixApi = {
   async executeCypher(query: string, parameters: Record<string, any> = {}): Promise<CypherQueryResult> {
     const startTime = performance.now();
     try {
-      const resp = await fetch(`${API_BASE_URL}/api/v1/graph/query`, {
+      const resp = await fetch(`${getApiBaseUrl()}/api/v1/graph/query`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1461,7 +1479,7 @@ export const clinixApi = {
    */
   async getPatients(): Promise<PatientRosterItem[]> {
     try {
-      const resp = await fetch(`${API_BASE_URL}/api/v1/patients`, {
+      const resp = await fetch(`${getApiBaseUrl()}/api/v1/patients`, {
         headers: {
           Accept: 'application/json',
           Authorization: 'Bearer vault-local-admin-token',
@@ -1481,7 +1499,7 @@ export const clinixApi = {
    */
   async createPatient(data: PatientCreateRequest): Promise<PatientRosterItem | null> {
     try {
-      const resp = await fetch(`${API_BASE_URL}/api/v1/patients`, {
+      const resp = await fetch(`${getApiBaseUrl()}/api/v1/patients`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1504,7 +1522,7 @@ export const clinixApi = {
    */
   async deletePatient(patientId: string): Promise<boolean> {
     try {
-      const resp = await fetch(`${API_BASE_URL}/api/v1/patients/${patientId}`, {
+      const resp = await fetch(`${getApiBaseUrl()}/api/v1/patients/${patientId}`, {
         method: 'DELETE',
         headers: {
           Accept: 'application/json',
@@ -1522,7 +1540,7 @@ export const clinixApi = {
    */
   async getPatientDetail(patientId: string): Promise<PatientDetailResponse | null> {
     try {
-      const resp = await fetch(`${API_BASE_URL}/api/v1/patients/${patientId}`, {
+      const resp = await fetch(`${getApiBaseUrl()}/api/v1/patients/${patientId}`, {
         headers: {
           Accept: 'application/json',
           Authorization: 'Bearer vault-local-admin-token',
@@ -1542,7 +1560,7 @@ export const clinixApi = {
    */
   async getPatientEncounters(patientId: string): Promise<any[]> {
     try {
-      const resp = await fetch(`${API_BASE_URL}/api/v1/patients/${patientId}/encounters`, {
+      const resp = await fetch(`${getApiBaseUrl()}/api/v1/patients/${patientId}/encounters`, {
         headers: {
           Accept: 'application/json',
           Authorization: 'Bearer vault-local-admin-token',
@@ -1562,7 +1580,7 @@ export const clinixApi = {
    */
   async getPatientReports(patientId: string): Promise<any[]> {
     try {
-      const resp = await fetch(`${API_BASE_URL}/api/v1/patients/${patientId}/reports`, {
+      const resp = await fetch(`${getApiBaseUrl()}/api/v1/patients/${patientId}/reports`, {
         headers: {
           Accept: 'application/json',
           Authorization: 'Bearer vault-local-admin-token',
@@ -1581,7 +1599,7 @@ export const clinixApi = {
    * Create a new clinical encounter for a patient
    */
   async createPatientEncounter(patientId: string, payload: any): Promise<any> {
-    const resp = await fetch(`${API_BASE_URL}/api/v1/patients/${patientId}/encounters`, {
+    const resp = await fetch(`${getApiBaseUrl()}/api/v1/patients/${patientId}/encounters`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1620,7 +1638,7 @@ export const clinixApi = {
     patient_id?: string;
   }> {
     try {
-      const resp = await fetch(`${API_BASE_URL}/api/v1/graph/cross-modal-audit`, {
+      const resp = await fetch(`${getApiBaseUrl()}/api/v1/graph/cross-modal-audit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1653,7 +1671,7 @@ export const clinixApi = {
     target_compartment?: string;
   }): Promise<RadiologyAnalysisResponse> {
     const startTime = performance.now();
-    const resp = await fetch(`${API_BASE_URL}/api/v1/radiology/voice-amend`, {
+    const resp = await fetch(`${getApiBaseUrl()}/api/v1/radiology/voice-amend`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1694,7 +1712,7 @@ export const clinixApi = {
     stat_priority?: string;
     cds_alerts?: any[];
   }): Promise<any> {
-    const resp = await fetch(`${API_BASE_URL}/api/v1/clinical/ipass-handoff`, {
+    const resp = await fetch(`${getApiBaseUrl()}/api/v1/clinical/ipass-handoff`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1715,7 +1733,7 @@ export const clinixApi = {
     raw_text: string;
     verified_pathologies?: string[];
   }): Promise<any> {
-    const resp = await fetch(`${API_BASE_URL}/api/v1/clinical/enforce-literacy`, {
+    const resp = await fetch(`${getApiBaseUrl()}/api/v1/clinical/enforce-literacy`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

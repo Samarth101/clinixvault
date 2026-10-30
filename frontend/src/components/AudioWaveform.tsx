@@ -4,6 +4,7 @@ import { Mic, MicOff, Radio, Volume2, ShieldCheck, AlertCircle } from 'lucide-re
 import { useAuth } from '../context/useAuth';
 import { SpeakerTurn } from '../types';
 import { clinixApi, getScribeWsUrl } from '../services/api';
+import { formatISTTime } from '../utils/time';
 
 interface AudioWaveformProps {
   isStreaming: boolean;
@@ -316,7 +317,7 @@ export const AudioWaveform: React.FC<AudioWaveformProps> = ({
                   const turn: SpeakerTurn = {
                     id: `turn-live-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
                     speaker: autoSpeaker,
-                    timestamp: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true }),
+                    timestamp: formatISTTime(new Date(), true),
                     text: transcriptText,
                     audioStartMs: Math.max(0, nowOffset - 3000),
                     audioEndMs: nowOffset,

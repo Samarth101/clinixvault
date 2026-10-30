@@ -9,6 +9,7 @@ import os
 import subprocess
 import time
 import sys
+import psutil
 import httpx
 from backend.gateway.schemas.requests import ModelPullRequest, ModelActiveRequest, OllamaRunRequest
 from backend.gateway.metrics import record_ollama_inference, update_microservice_health
@@ -153,29 +154,46 @@ async def stop_ollama_daemon():
     Cross-platform termination of local Ollama server/application.
     On macOS: cleanly dismisses top menu bar icon via AppleScript and kills background daemons.
     On Linux/Windows: stops systemd services / terminates runner processes.
+    Proactively unloads any active models from memory and forcefully terminates zombie runners.
     """
     is_mac = sys.platform == "darwin"
     is_win = sys.platform == "win32"
     details = []
 
+    # 1. Proactively evict any loaded models from VRAM/RAM via keep_alive: 0
+    try:
+        async with httpx.AsyncClient(timeout=1.0) as client:
+            ps_resp = await client.get("http://127.0.0.1:11434/api/ps")
+            if ps_resp.status_code == 200:
+                for m in ps_resp.json().get("models", []):
+                    m_name = m.get("model") or m.get("name")
+                    if m_name:
+                        await client.post(
+                            "http://127.0.0.1:11434/api/generate",
+                            json={"model": m_name, "keep_alive": 0},
+                        )
+                details.append("Active models evicted from memory.")
+    except Exception:
+        pass
+
+    # 2. Platform-specific stop signals
     if is_mac:
-        # 1. Gracefully close macOS Menu Bar App so top bar icon is removed
+        # Gracefully close macOS Menu Bar App so top bar icon is removed
         try:
             subprocess.run(["osascript", "-e", 'quit app "Ollama"'], capture_output=True, timeout=2.5)
             details.append("macOS Ollama menu bar app quit signal sent.")
         except Exception as e:
             details.append(f"AppleScript notice: {e}")
 
-        # 2. Terminate any residual Ollama runner daemons
         try:
-            subprocess.run(["killall", "Ollama"], capture_output=True, timeout=2.0)
-            details.append("killall Ollama executed.")
+            subprocess.run(["killall", "-9", "Ollama"], capture_output=True, timeout=2.0)
+            subprocess.run(["killall", "-9", "ollama"], capture_output=True, timeout=2.0)
+            details.append("killall Ollama (-9) executed.")
         except Exception:
             pass
         try:
-            subprocess.run(["pkill", "-f", "ollama serve"], capture_output=True, timeout=2.0)
-            subprocess.run(["pkill", "-f", "ollama"], capture_output=True, timeout=2.0)
-            details.append("pkill ollama executed.")
+            subprocess.run(["pkill", "-9", "-f", "ollama"], capture_output=True, timeout=2.0)
+            details.append("pkill -9 -f ollama executed.")
         except Exception:
             pass
 
@@ -194,13 +212,31 @@ async def stop_ollama_daemon():
         except Exception:
             pass
         try:
-            subprocess.run(["pkill", "-f", "ollama serve"], capture_output=True, timeout=2.0)
-            subprocess.run(["pkill", "-f", "ollama"], capture_output=True, timeout=2.0)
-            details.append("pkill ollama executed.")
+            subprocess.run(["pkill", "-9", "-f", "ollama"], capture_output=True, timeout=2.0)
+            details.append("pkill -9 -f ollama executed.")
         except Exception:
             pass
 
-    # Verify if service is still responding
+    # 3. Comprehensive psutil process sweep to terminate all residual ollama processes
+    killed_count = 0
+    current_pid = os.getpid() if 'os' in globals() else None
+    for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+        try:
+            if current_pid and proc.info['pid'] == current_pid:
+                continue
+            name = (proc.info.get('name') or '').lower()
+            cmd = " ".join(proc.info.get('cmdline') or []).lower()
+            if 'ollama' in name or 'ollama' in cmd:
+                proc.kill()
+                killed_count += 1
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            pass
+
+    if killed_count > 0:
+        details.append(f"Terminated {killed_count} residual ollama process(es) via psutil.")
+
+    # 4. Verify if service is still responding
+    time.sleep(0.3)
     still_running = False
     try:
         async with httpx.AsyncClient(timeout=1.0) as client:

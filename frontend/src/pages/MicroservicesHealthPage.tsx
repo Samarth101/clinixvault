@@ -15,10 +15,13 @@ import {
   Trash2, 
   Usb,
   RefreshCw,
-  Square
+  Square,
+  BarChart3,
+  ExternalLink,
+  ShieldCheck,
 } from 'lucide-react';
 import { PipelineStage } from '../types';
-import { clinixApi, SystemHealthResponse } from '../services/api';
+import { clinixApi, SystemHealthResponse, getApiBaseUrl } from '../services/api';
 
 export const MicroservicesHealthPage: React.FC = () => {
   const [selectedStage, setSelectedStage] = useState<PipelineStage>(PIPELINE_STAGES[2]); // C++ kernel initially
@@ -195,13 +198,13 @@ export const MicroservicesHealthPage: React.FC = () => {
           <div>
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-50 border border-blue-200 text-clinical-blue text-xs font-semibold mb-3.5 shadow-sm">
               <Server className="w-3.5 h-3.5" />
-              <span>K3s Edge Orchestration • Air-Gapped Microservice Topology</span>
+              <span>Clinical Edge Services • Real-Time Observability Matrix</span>
             </div>
             <h1 className="text-3xl lg:text-4xl font-extrabold tracking-tight text-slate-900">
-              Microservices & Cluster Health
+              Microservices & Observability Health
             </h1>
             <p className="text-slate-600 text-sm mt-2.5 max-w-2xl leading-relaxed">
-              Live status, sub-millisecond pod latencies, and end-to-end data pipelines running isolated on edge bare-metal hardware with zero internet dependency.
+              Live status, sub-millisecond API latencies, and end-to-end data pipelines running isolated on edge bare-metal hardware with Prometheus OpenMetrics integration for Grafana Cloud.
             </p>
           </div>
 
@@ -460,64 +463,100 @@ export const MicroservicesHealthPage: React.FC = () => {
         )}
       </motion.section>
 
-      {/* 3. Live K3s Pod Isolation Matrix */}
+      {/* 3. Live Appliance Microservices Topology & Observability */}
       <motion.section 
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35, delay: 0.12 }}
         className="glass-card p-8 border border-white/90 shadow-diffuse"
       >
-        <div className="flex items-center justify-between mb-7 pb-4 border-b border-slate-100">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-100">
           <div>
             <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2.5">
               <Cpu className="w-5 h-5 text-clinical-blue" />
-              Live K3s Pod Isolation Matrix
+              Live Appliance Microservices Topology & Observability
             </h2>
             <p className="text-xs text-slate-500 mt-1">
-              Deterministic resource limits and isolated cgroups across all {microservices.length} appliance microservices
+              Deterministic resource boundaries and live telemetry across all {microservices.length} appliance microservices
             </p>
           </div>
-          <span className="px-3 py-1 bg-blue-50 text-clinical-blue rounded-full text-xs font-bold font-mono border border-blue-200/60">
-            {healthyCount} / {microservices.length} Active Pods
-          </span>
+          <div className="flex items-center gap-3">
+            <a
+              href={`${getApiBaseUrl()}/metrics`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3.5 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 text-xs font-bold transition-all shadow-xs inline-flex items-center gap-1.5 cursor-pointer"
+              title="Open raw Prometheus OpenMetrics payload"
+            >
+              <BarChart3 className="w-3.5 h-3.5 text-purple-600" />
+              <span>Prometheus /metrics</span>
+              <ExternalLink className="w-3 h-3 opacity-60" />
+            </a>
+            <span className="px-3 py-1.5 bg-blue-50 text-clinical-blue rounded-xl text-xs font-bold font-mono border border-blue-200/60">
+              {healthyCount} / {microservices.length} Services Active
+            </span>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {microservices.map((pod) => (
+        {/* Grafana Observability Integration Banner */}
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-purple-50/70 to-blue-50/70 border border-purple-100/80 mb-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-white text-purple-600 flex items-center justify-center font-bold shadow-xs border border-purple-100">
+              <Activity className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-xs font-bold text-slate-900 flex items-center gap-2">
+                <span>Grafana Cloud & Prometheus Exporter Active</span>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">Scraping Active</span>
+              </div>
+              <p className="text-[11px] text-slate-600 mt-0.5">
+                Microservice metrics, VRAM, token counters, and API latencies are scraped live at <code className="font-mono text-purple-700 bg-white/80 px-1 py-0.5 rounded text-[10px]">/metrics</code> without requiring Kubernetes pod wrappers.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 text-xs font-mono text-slate-500 self-end md:self-center">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span>Zero-Egress Prometheus Agent</span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {microservices.map((svc) => (
             <motion.div
-              key={pod.name}
+              key={svc.name}
               whileHover={{ y: -4 }}
               className="p-5 rounded-[24px] bg-white border border-slate-200/80 shadow-sm space-y-3 relative overflow-hidden"
             >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-900 truncate max-w-[180px]">
-                  {pod.service}
+                <span className="text-xs font-bold text-slate-900 truncate max-w-[190px]">
+                  {svc.service}
                 </span>
                 <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  {pod.status}
+                  {svc.status}
                 </span>
               </div>
 
-              <div className="text-[11px] text-slate-500 font-mono">
-                Port :{pod.port} • {pod.uptime}
+              <div className="text-[11px] text-slate-500 font-mono flex items-center justify-between">
+                <span>Port {svc.port > 0 ? `:${svc.port}` : 'Internal IPC'}</span>
+                <span className="text-[10px] text-slate-400">{svc.uptime}</span>
               </div>
 
               <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 text-[11px] font-mono">
                 <div>
                   <span className="text-slate-400 block text-[10px]">P95 LATENCY</span>
-                  <span className="font-bold text-slate-800">{pod.latencyMs} ms</span>
+                  <span className="font-bold text-slate-800">{svc.latencyMs} ms</span>
                 </div>
                 <div>
                   <span className="text-slate-400 block text-[10px]">RAM / VRAM</span>
                   <span className="font-bold text-slate-800">
-                    {pod.vramMb ? `${pod.vramMb}MB VRAM` : `${pod.memoryMb}MB RAM`}
+                    {svc.vramMb ? `${svc.vramMb}MB VRAM` : `${svc.memoryMb}MB RAM`}
                   </span>
                 </div>
               </div>
 
               <p className="text-[11px] text-slate-500 line-clamp-2 italic pt-1">
-                {pod.description}
+                {svc.description}
               </p>
             </motion.div>
           ))}

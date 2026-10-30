@@ -254,7 +254,7 @@ async def scribe_websocket_stream(websocket: WebSocket):
                     # Synthesize SOAP Note via LLM service
                     soap_res = None
                     try:
-                        async with httpx.AsyncClient(timeout=45.0) as client:
+                        async with httpx.AsyncClient(timeout=httpx.Timeout(3.0, connect=1.5)) as client:
                             resp = await client.post(
                                 f"{settings.LLM_URL}/generate_soap",
                                 json={"clinical_dialogue": full_dialogue, "patient_id": patient_id},
@@ -492,7 +492,7 @@ async def synthesize_soap_from_dialogue(request: SoapSynthesisRequest):
 
     soap_res = None
     try:
-        async with httpx.AsyncClient(timeout=45.0) as client:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(3.0, connect=1.5)) as client:
             resp = await client.post(
                 f"{settings.LLM_URL}/generate_soap",
                 json={"clinical_dialogue": dialogue, "patient_id": request.patient_id},
