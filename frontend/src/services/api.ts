@@ -690,14 +690,15 @@ export const clinixApi = {
       const sumRes = await this.summarizeClinicalText(textDialogue, 'soap', modelName);
       if (sumRes) {
         return {
-          subjective: sumRes.summary || `Patient presents for clinical consultation based on recorded dialogue.`,
-          objective: 'Vital signs reviewed. Physical findings evaluated during consultation.',
+          subjective: sumRes.summary || '',
+          objective: '',
           assessment: sumRes.keyFindings.length > 0
             ? sumRes.keyFindings.map((f, i) => `${i + 1}. ${f}`).join('\n')
-            : '1. Primary clinical evaluation based on consultation dialogue.',
+            : '',
           plan: sumRes.actionItems.length > 0
             ? sumRes.actionItems.map((a, i) => `${i + 1}. ${a}`).join('\n')
-            : '1. Symptomatic care and treatment as discussed.\n2. Clinic follow-up as scheduled.',
+            : '',
+          is_insufficient: !sumRes.summary && sumRes.keyFindings.length === 0,
           latencyMs: sumRes.latencyMs,
           patientReport: sumRes.patientReport,
         };
