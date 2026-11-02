@@ -167,40 +167,46 @@ export const HeaderBar: React.FC<HeaderBarProps> = React.memo(({
               {/* Quick Persona Switcher in Dropdown */}
               <div className="space-y-1">
                 <div className="text-[10px] uppercase font-bold tracking-wider text-slate-400 px-1 mb-1">
-                  Switch Clinician Persona
+                  Active Directory Clinicians ({availableUsers.length})
                 </div>
-                {availableUsers.map((profile) => {
-                  const isCurrent = profile.id === currentUser.id;
-                  return (
-                    <button
-                      key={profile.id}
-                      onClick={() => {
-                        switchUser(profile.id);
-                        setIsUserMenuOpen(false);
-                      }}
-                      className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-colors cursor-pointer ${
-                        isCurrent
-                          ? 'bg-blue-50 dark:bg-blue-950/50 text-clinical-blue dark:text-blue-300 font-bold border border-blue-200/60 dark:border-blue-900/40'
-                          : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2.5 truncate">
-                        <span className="w-6 h-6 rounded-lg bg-clinical-blue/10 dark:bg-clinical-blue/20 text-clinical-blue flex items-center justify-center font-bold text-[10px] shrink-0">
-                          {profile.avatarInitials}
-                        </span>
-                        <div className="truncate">
-                          <div className="text-xs font-semibold truncate">{profile.name}</div>
-                          <div className="text-[10px] text-slate-400 truncate">{profile.role}</div>
+                {availableUsers.length === 0 ? (
+                  <div className="p-2.5 text-center text-slate-400 text-[11px] bg-slate-50 dark:bg-slate-800/40 rounded-xl">
+                    No clinicians registered yet.
+                  </div>
+                ) : (
+                  availableUsers.map((profile) => {
+                    const isCurrent = profile.id === currentUser.id;
+                    return (
+                      <button
+                        key={profile.id}
+                        onClick={() => {
+                          switchUser(profile.id);
+                          setIsUserMenuOpen(false);
+                        }}
+                        className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-colors cursor-pointer ${
+                          isCurrent
+                            ? 'bg-blue-50 dark:bg-blue-950/50 text-clinical-blue dark:text-blue-300 font-bold border border-blue-200/60 dark:border-blue-900/40'
+                            : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 truncate">
+                          <span className="w-6 h-6 rounded-lg bg-clinical-blue/10 dark:bg-clinical-blue/20 text-clinical-blue flex items-center justify-center font-bold text-[10px] shrink-0">
+                            {profile.avatarInitials}
+                          </span>
+                          <div className="truncate">
+                            <div className="text-xs font-semibold truncate">{profile.name}</div>
+                            <div className="text-[10px] text-slate-400 truncate">{profile.role}</div>
+                          </div>
                         </div>
-                      </div>
-                      {isCurrent && (
-                        <span className="text-[9px] font-mono text-emerald-600 font-bold bg-emerald-50 dark:bg-emerald-950 px-1.5 py-0.5 rounded shrink-0">
-                          ACTIVE
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
+                        {isCurrent && (
+                          <span className="text-[9px] font-mono text-emerald-600 font-bold bg-emerald-50 dark:bg-emerald-950 px-1.5 py-0.5 rounded shrink-0">
+                            ACTIVE
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })
+                )}
               </div>
 
               <div className="h-[1px] bg-slate-200/80 dark:border-slate-800" />
@@ -213,7 +219,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = React.memo(({
                 className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors font-medium text-left cursor-pointer"
               >
                 <Users className="w-4 h-4 text-clinical-blue" />
-                <span>SSO / Active Directory Login</span>
+                <span>Register / Switch Clinician Identity</span>
               </button>
 
               <button
@@ -307,9 +313,9 @@ export const HeaderBar: React.FC<HeaderBarProps> = React.memo(({
           title="Click to Open Model Manager & Unified Memory Dashboard"
         >
           <Cpu className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-          <span className="font-extrabold text-[11px]">{hardware?.gpu_name || hardware?.chip || 'Apple Silicon / CUDA'}</span>
+          <span className="font-extrabold text-[11px]">{hardware?.gpu_name || hardware?.chip || 'Compute Node'}</span>
           <span className="text-[10px] font-mono text-indigo-700 dark:text-indigo-300 bg-white/90 dark:bg-slate-900 px-1 py-0.5 rounded border border-indigo-200 dark:border-indigo-800 font-bold">
-            {hardware?.is_apple_silicon ? `${hardware.total_memory_gb}GB Unified` : `${hardware?.total_memory_gb || 16}GB VRAM`}
+            {hardware ? (hardware.is_apple_silicon ? `${hardware.total_memory_gb}GB Unified` : `${hardware.total_memory_gb}GB RAM/VRAM`) : 'Awaiting Link'}
           </span>
         </motion.button>
 

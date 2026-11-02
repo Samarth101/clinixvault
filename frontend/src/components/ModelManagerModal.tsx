@@ -48,8 +48,8 @@ export const ModelManagerModal: React.FC<ModelManagerModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [pullStatus, setPullStatus] = useState<ModelPullStatus | null>(null);
   const [isPulling, setIsPulling] = useState(false);
-  const [selectedRadModel, setSelectedRadModel] = useState<string>('llava:latest');
-  const [selectedSumModel, setSelectedSumModel] = useState<string>('qwen2.5-coder:1.5b');
+  const [selectedRadModel, setSelectedRadModel] = useState<string>('');
+  const [selectedSumModel, setSelectedSumModel] = useState<string>('');
   const [activeSaveMsg, setActiveSaveMsg] = useState<string | null>(null);
   const [dropdownDownloadModel, setDropdownDownloadModel] = useState<string>('llama3.2-vision:11b');
   const [isCustomModel, setIsCustomModel] = useState<boolean>(false);
@@ -306,10 +306,10 @@ export const ModelManagerModal: React.FC<ModelManagerModalProps> = ({
                   </span>
                 </div>
                 <div className="text-base font-extrabold text-slate-900 dark:text-white">
-                  {hardware?.chip || 'Apple Silicon M-Series'}
+                  {hardware?.chip || 'Host Compute Node'}
                 </div>
                 <div className="text-xs text-indigo-600 dark:text-indigo-400 font-medium">
-                  {hardware?.accelerator || 'Apple Metal (MPS)'} • {hardware?.cpu_cores_physical || 8} Cores
+                  {hardware?.accelerator || 'Standard Compute (CPU)'} • {hardware?.cpu_cores_physical || 0} Cores
                 </div>
               </div>
 
@@ -579,9 +579,6 @@ export const ModelManagerModal: React.FC<ModelManagerModalProps> = ({
                           {m.name} ({m.size_formatted}) {m.is_vision ? '• Vision Capable' : ''}
                         </option>
                       ))}
-                      {!installed.some((i) => i.id === 'llava:latest') && (
-                        <option value="llava:latest">llava:latest (Fallback VLM)</option>
-                      )}
                     </optgroup>
                   </select>
                 </div>

@@ -174,9 +174,11 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
         if (/atorvastatin/i.test(soapData.plan) || /atorvastatin/i.test(soapData.assessment)) meds.push("Atorvastatin 40mg");
 
         const allergies: string[] = [];
-        if (selectedEncounter?.patientName?.includes("Eleanor") || selectedEncounter?.id === "ENC-9082") {
-          allergies.push("Aspirin");
-        }
+        const combinedText = `${soapData.subjective} ${transcriptTurns.map((t) => t.text).join(' ')}`.toLowerCase();
+        if (/allergic to aspirin|aspirin allergy/i.test(combinedText)) allergies.push("Aspirin");
+        if (/allergic to penicillin|penicillin allergy/i.test(combinedText)) allergies.push("Penicillin");
+        if (/allergic to sulfa|sulfa allergy/i.test(combinedText)) allergies.push("Sulfa");
+        if (/allergic to nsaid|nsaid allergy/i.test(combinedText)) allergies.push("NSAIDs");
 
         // Only run CDS check if actual medications were extracted or prescribed
         if (meds.length === 0) {
@@ -230,7 +232,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
         }
         const res = await clinixApi.extractMedicalCodes({
           clinicalText: fullText,
-          patientId: selectedEncounter?.mrn || 'ENC-9082',
+          patientId: selectedEncounter?.mrn || selectedEncounter?.id || 'ACTIVE-ENCOUNTER',
           encounterId: selectedEncounter?.id,
         });
         if (isCurrent && res && !res.is_insufficient) {
@@ -251,10 +253,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
   const handleApplyAlternative = (alt: string) => {
     setSoapData((prev) => ({
       ...prev,
-      plan: prev.plan.replace(
-        /Initiate Meloxicam[^\n.]*/i,
-        `Initiate ${alt} as renal & allergy-safe alternative. Discontinue oral non-selective NSAID.`
-      ),
+      plan: prev.plan ? `${prev.plan}\nInitiate ${alt} as safe alternative.` : `Initiate ${alt} as safe alternative.`,
     }));
   };
 
@@ -692,10 +691,10 @@ HIPAA Security Rule §164.312 Integrity Mechanism Certified
               </span>
               <span className="text-sm font-extrabold text-indigo-700 flex items-center gap-1.5 mt-1 font-mono">
                 <Activity className="w-4 h-4 text-indigo-500" />
-                {hardwareSpecs ? `${hardwareSpecs.used_memory_gb.toFixed(1)} / ${hardwareSpecs.total_memory_gb.toFixed(0)} GB` : '15.4 / 24 GB'}
+                {hardwareSpecs && hardwareSpecs.total_memory_gb > 0 ? `${hardwareSpecs.used_memory_gb.toFixed(1)} / ${hardwareSpecs.total_memory_gb.toFixed(0)} GB` : 'Offline'}
               </span>
               <span className="text-[10px] font-mono text-indigo-600 block mt-0.5">
-                {hardwareSpecs ? `${hardwareSpecs.memory_percent}% • ${hardwareSpecs.accelerator}` : 'Apple Metal (MPS)'}
+                {hardwareSpecs && hardwareSpecs.accelerator ? `${hardwareSpecs.memory_percent}% • ${hardwareSpecs.accelerator}` : 'Telemetry Offline'}
               </span>
             </motion.div>
           </div>

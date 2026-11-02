@@ -31,8 +31,8 @@ export const PatientReportView: React.FC<PatientReportViewProps> = ({
   report,
   patientName,
   studyTitle,
-  doctorName = 'Dr. Amanda Chen, MD (CMIO)',
-  dateStr = 'Today, 10:45 AM',
+  doctorName = 'Attending Clinician',
+  dateStr = 'Today',
   onRefresh,
   isGenerating = false,
 }) => {

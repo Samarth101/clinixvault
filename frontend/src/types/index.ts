@@ -1,4 +1,4 @@
-export type PageId = 'landing' | 'overview' | 'patients' | 'provenance' | 'radiology' | 'summarizer' | 'microservices' | 'hardware' | 'staff' | 'graph';
+export type PageId = 'landing' | 'overview' | 'patients' | 'provenance' | 'radiology' | 'summarizer' | 'hardware' | 'staff' | 'graph';
 
 export interface StaffMember {
   id: string;

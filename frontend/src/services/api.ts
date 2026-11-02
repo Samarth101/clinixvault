@@ -322,23 +322,23 @@ export const clinixApi = {
         return await resp.json();
       }
     } catch {
-      // offline fallback
+      // offline
     }
     return {
-      platform: 'darwin',
-      chip: 'Apple M3',
-      raw_brand: 'Apple M3',
-      memory_type: 'Unified Memory',
-      total_memory_gb: 16.0,
-      free_memory_gb: 1.4,
-      used_memory_gb: 14.6,
-      memory_percent: 91.2,
-      accelerator: 'Apple Metal (MPS)',
-      is_apple_silicon: true,
-      gpu_name: 'Apple M3 (Unified)',
-      cpu_cores_physical: 8,
-      cpu_cores_logical: 8,
-      cpu_percent: 12.0,
+      platform: 'unknown',
+      chip: 'Host Compute Node',
+      raw_brand: 'Compute Node',
+      memory_type: 'System RAM',
+      total_memory_gb: 0,
+      free_memory_gb: 0,
+      used_memory_gb: 0,
+      memory_percent: 0,
+      accelerator: 'Offline / Awaiting Telemetry',
+      is_apple_silicon: false,
+      gpu_name: 'Compute Node',
+      cpu_cores_physical: 0,
+      cpu_cores_logical: 0,
+      cpu_percent: 0,
     };
   },
 
@@ -354,73 +354,18 @@ export const clinixApi = {
         return await resp.json();
       }
     } catch {
-      // fallback
+      // offline
     }
     return {
-      installed_models: [
-        {
-          id: 'llava:latest',
-          name: 'llava:latest',
-          tag: 'llava:latest',
-          source: 'ollama',
-          format: 'gguf',
-          parameter_size: '7B',
-          quantization_level: 'Q4_0',
-          size_bytes: 4733363377,
-          size_formatted: '4.7 GB',
-          capabilities: ['completion', 'vision'],
-          is_vision: true,
-        },
-        {
-          id: 'qwen2.5-coder:1.5b',
-          name: 'qwen2.5-coder:1.5b',
-          tag: 'qwen2.5-coder:1.5b',
-          source: 'ollama',
-          format: 'gguf',
-          parameter_size: '1.5B',
-          quantization_level: 'Q4_K_M',
-          size_bytes: 986062089,
-          size_formatted: '986 MB',
-          capabilities: ['completion'],
-          is_vision: false,
-        },
-      ],
+      installed_models: [],
       available_models: [],
-      fine_tuned_models: [
-        {
-          id: "clinixvault-qwen2vl-qlora",
-          name: "Qwen2-VL 2B (MIMIC QLoRA SOTA)",
-          tag: "clinixvault-qwen2vl-qlora",
-          displayName: "Qwen2-VL 2B • Two-Stage QLoRA SOTA Champion",
-          size: "28 MB (Adapter) / 2.2B (Base)",
-          size_bytes: 29360128,
-          parameter_size: "2.2B",
-          category: "Fine-Tuned Research VLM",
-          technique: "Two-Stage Hierarchical + QLoRA (NF4)",
-          description: "ICLR 2026 Champion two-stage hierarchical model fine-tuned on MIMIC-CXR. Operates with an Agentic NegEx Critic reconciling contradictions between anatomical findings and clinical impressions.",
-          recommended_for: "radiology",
-          is_vision: true,
-          is_fine_tuned: true,
-          is_installed: true,
-          adapter_path: "checkpoints/qwen2_vl_mimic_cxr_lora",
-          benchmark_scores: {
-            clinical_f1: 0.9027,
-            chexpert_recall: "89.50%",
-            hallucination_rate: "3.33%",
-            bleu_4: 0.2315,
-            rouge_l: 0.3892,
-            latency_ms: 1120,
-          },
-          status: "ready",
-          highlight: "ICLR 2026 SOTA Champion (90.27% F1)",
-        },
-      ],
-      active_radiology_model: 'clinixvault-qwen2vl-qlora',
-      active_summarize_model: 'qwen2.5-coder:1.5b',
+      fine_tuned_models: [],
+      active_radiology_model: '',
+      active_summarize_model: '',
       ollama_status: {
-        connected: true,
+        connected: false,
         host: 'http://127.0.0.1:11434',
-        version: '0.34.2',
+        version: 'Disconnected',
       },
     };
   },
@@ -614,27 +559,14 @@ export const clinixApi = {
           keyFindings: data.key_findings || [],
           actionItems: data.action_items || [],
           latencyMs: data.latency_ms || Math.round(performance.now() - startTime),
-          modelVersion: data.model_version || modelName || 'Mistral-7B',
+          modelVersion: data.model_version || modelName || 'Clinical-LLM',
           patientReport: data.patient_report,
         };
       }
-    } catch {
-      // fallback
+      throw new Error(`Summarization endpoint returned HTTP ${resp.status}`);
+    } catch (err: any) {
+      throw new Error(`Clinical text summarization failed: ${err?.message || 'Backend service unreachable'}`);
     }
-    return {
-      summaryId: 'local-fallback',
-      summary: `Clinical Summary (${summaryType.toUpperCase()}):\n${clinicalText.slice(0, 320)}...`,
-      keyFindings: [
-        'Documented longitudinal care metrics reviewed.',
-        'Primary physiological stability maintained.',
-      ],
-      actionItems: [
-        'Continue prescribed medical regimen.',
-        'Follow-up in 2 weeks for clinical re-evaluation.',
-      ],
-      latencyMs: Math.round(performance.now() - startTime),
-      modelVersion: modelName || 'Mistral-7B',
-    };
   },
 
   /**
@@ -643,7 +575,7 @@ export const clinixApi = {
   async summarizeDocument(
     documentBase64?: string,
     clinicalText?: string,
-    patientId = 'ENC-9082',
+    patientId?: string,
     summaryType = 'discharge',
     modelName?: string
   ): Promise<{
@@ -693,38 +625,13 @@ export const clinixApi = {
           ocrApplied: data.ocr_applied ?? false,
           pagesProcessed: data.pages_processed ?? 1,
           latencyMs: data.latency_ms ?? Math.round(performance.now() - startTime),
-          modelVersion: data.model_version || 'ClinixVault-Mistral-7B-Summarizer',
+          modelVersion: data.model_version || modelName || 'Clinical-Summarizer',
         };
       }
-    } catch (err) {
-      console.warn('Document summarizer network fallback:', err);
+      throw new Error(`Document summarizer returned HTTP ${resp.status}`);
+    } catch (err: any) {
+      throw new Error(`Document summarizer error: ${err?.message || 'Summarization engine is offline or unreachable'}`);
     }
-
-    return {
-      summaryId: 'doc-fallback-01',
-      patientId,
-      summary: clinicalText ? `Clinical Summary:\n${clinicalText.slice(0, 350)}...` : 'Patient documentation reviewed. Hemodynamic and metabolic parameters evaluated.',
-      sections: { CLINICAL_NOTE: clinicalText || 'Routine clinical chart review' },
-      keyFindings: [
-        'Documented longitudinal care metrics reviewed.',
-        'No acute focal organ decompensation identified.',
-      ],
-      actionItems: [
-        'Continue prescribed medical regimen.',
-        'Follow-up in 2 weeks for clinical re-evaluation.',
-      ],
-      citations: [],
-      flowsheet: [
-        { test_name: 'Troponin I', value: 0.02, unit: 'ng/mL', reference_range: '0.0 - 0.04', flag: 'NORMAL', is_abnormal: false },
-        { test_name: 'Serum Potassium', value: 4.2, unit: 'mmol/L', reference_range: '3.5 - 5.0', flag: 'NORMAL', is_abnormal: false },
-        { test_name: 'Serum Creatinine', value: 0.95, unit: 'mg/dL', reference_range: '0.7 - 1.3', flag: 'NORMAL', is_abnormal: false },
-      ],
-      groundingScore: 0.98,
-      ocrApplied: false,
-      pagesProcessed: 1,
-      latencyMs: Math.round(performance.now() - startTime),
-      modelVersion: modelName || 'ClinixVault-Offline-Summarizer',
-    };
   },
 
   /**
@@ -800,10 +707,11 @@ export const clinixApi = {
     }
 
     return {
-      subjective: `Patient presents for clinical evaluation. Dialogue: ${textDialogue.slice(0, 180)}...`,
-      objective: 'Vital signs stable upon assessment.',
-      assessment: '1. Clinical consultation in progress.',
-      plan: '1. Continue supportive care and planned interventions.',
+      subjective: '',
+      objective: '',
+      assessment: '',
+      plan: '',
+      is_insufficient: true,
       latencyMs: Math.round(performance.now() - startTime),
     };
   },
@@ -873,24 +781,24 @@ export const clinixApi = {
         isLiveBackend: false,
         latencyMs: Math.max(12, latencyMs > 2000 ? 18 : latencyMs),
         data: {
-          status: 'operational',
+          status: 'unreachable',
           timestamp: Date.now() / 1000,
-          database: { status: 'connected' },
+          database: { status: 'disconnected' },
           downstream_services: {
-            vlm_service: { status: 'reachable' },
-            llm_service: { status: 'reachable' },
-            audio_service: { status: 'reachable' },
-            document_service: { status: 'reachable' },
+            vlm_service: { status: 'unreachable' },
+            llm_service: { status: 'unreachable' },
+            audio_service: { status: 'unreachable' },
+            document_service: { status: 'unreachable' },
           },
           telemetry: {
-            cpu_usage_pct: 12.4,
-            memory_usage_pct: 54.8,
-            gpu_temperature_c: 41,
-            gpu_utilization_pct: 48,
-            gpu_vram_used_mb: 8192,
+            cpu_usage_pct: 0,
+            memory_usage_pct: 0,
+            gpu_temperature_c: 0,
+            gpu_utilization_pct: 0,
+            gpu_vram_used_mb: 0,
             wan_egress_bytes: 0,
-            accelerator: 'Apple Metal (MPS)',
-            memory_type: 'Unified Memory',
+            accelerator: 'Offline',
+            memory_type: 'System RAM',
           },
         },
       };
@@ -949,7 +857,7 @@ export const clinixApi = {
           impression: result.impression || '',
           fullReport: result.full_report || '',
           inferenceTimeMs: Math.round(performance.now() - startTime),
-          modelVersion: result.model_version || request.modelName || 'llava:latest',
+          modelVersion: result.model_version || request.modelName || 'Qwen2-VL',
           pathologies: result.pathologies || [],
           patientReport: result.patient_report,
           stage1Findings: result.findings,
@@ -1054,57 +962,28 @@ export const clinixApi = {
     clinicalIndication = '',
     modelName?: string
   ): Promise<PatientReport> {
-    try {
-      const resp = await fetch(`${getApiBaseUrl()}/api/v1/radiology/simplify`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: 'Bearer vault-local-admin-token',
-        },
-        body: JSON.stringify({
-          clinical_text: clinicalText,
-          clinical_indication: clinicalIndication,
-          report_type: 'radiology',
-          model_name: modelName,
-        }),
-      });
-      if (resp.ok) {
-        const data = await resp.json();
-        if (data.patient_report) {
-          return data.patient_report;
-        }
-      }
-    } catch {
-      // fallback
+    const resp = await fetch(`${getApiBaseUrl()}/api/v1/radiology/simplify`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer vault-local-admin-token',
+      },
+      body: JSON.stringify({
+        clinical_text: clinicalText,
+        clinical_indication: clinicalIndication,
+        report_type: 'radiology',
+        model_name: modelName,
+      }),
+    });
+    if (!resp.ok) {
+      const err = await resp.text().catch(() => '');
+      throw new Error(`Radiology lay summary generation failed (HTTP ${resp.status}): ${err || 'Model inference service unavailable'}`);
     }
-    return {
-      headline: "Your diagnostic study has been thoroughly evaluated by our clinical AI and physician team.",
-      what_was_examined: "Chest radiograph diagnostic study examining lungs, cardiac structures, and thorax.",
-      doctor_explanation: "Hello! We reviewed your diagnostic imaging. The results show that your key organs and structures are stable without acute emergencies or active infections.",
-      key_findings: [
-        "Lungs: Clear without active pneumonia or acute fluid accumulation.",
-        "Heart: Normal size and regular physiological contours.",
-        "Thorax: Intact osseous structures with no fractures."
-      ],
-      what_it_means: "Your results are reassuring and indicate good overall respiratory stability.",
-      next_steps: [
-        "Continue your current daily care plan.",
-        "Reach out if symptoms change or persist.",
-        "Keep your scheduled follow-up appointment."
-      ],
-      jargon_translations: [
-        {
-          medical_term: "Within Normal Limits",
-          simple_meaning: "Completely healthy and normal",
-          context: "Standard healthy baseline for your age."
-        }
-      ],
-      questions_for_doctor: [
-        "Do these results explain my current symptoms?",
-        "When should I come in for my next checkup?"
-      ],
-      reading_level: "Grade 6 (Plain Language Certified)",
-    };
+    const data = await resp.json();
+    if (data.patient_report) {
+      return data.patient_report;
+    }
+    throw new Error(data.error || 'Backend did not return a valid patient report');
   },
 
   /**
@@ -1115,25 +994,6 @@ export const clinixApi = {
     patientId?: string;
     encounterId?: string;
   }): Promise<CodingExtractionResponse> {
-    try {
-      const resp = await fetch(`${getApiBaseUrl()}/api/v1/scribe/extract-codes`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: 'Bearer vault-local-admin-token',
-        },
-        body: JSON.stringify({
-          clinical_text: payload.clinicalText,
-          patient_id: payload.patientId || 'ENC-9082',
-          encounter_id: payload.encounterId,
-        }),
-      });
-      if (resp.ok) {
-        return await resp.json();
-      }
-    } catch {
-      // offline fallback
-    }
     const isNonClinical = !payload.clinicalText || /insufficient|non-clinical|conversational/i.test(payload.clinicalText);
     if (isNonClinical) {
       return {
@@ -1147,53 +1007,22 @@ export const clinixApi = {
         is_insufficient: true,
       };
     }
-    return {
-      status: 'fallback',
-      primary_diagnosis: {
-        code: 'M17.11',
-        description: 'Unilateral primary osteoarthritis, right knee',
-        category: 'ICD-10-CM',
-        confidence: 0.98,
-        rationale: 'Right knee crepitus and antalgic gait documented.',
-        is_primary: true,
+    const resp = await fetch(`${getApiBaseUrl()}/api/v1/scribe/extract-codes`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer vault-local-admin-token',
       },
-      secondary_diagnoses: [
-        {
-          code: 'I10',
-          description: 'Essential (primary) hypertension',
-          category: 'ICD-10-CM',
-          confidence: 0.95,
-          rationale: 'Documented BP 128/82 mmHg and cardiovascular history.',
-        },
-      ],
-      cpt_procedure_codes: [
-        {
-          code: '99214',
-          description: 'Office visit, established patient (Moderate Complexity, 30-39 min)',
-          category: 'CPT',
-          confidence: 0.98,
-          rationale: 'Prescription drug management and chronic condition evaluation meet AMA 2024 Level 4 MDM.',
-        },
-        {
-          code: '73562',
-          description: 'Radiologic examination, knee; 3 views (Standing)',
-          category: 'CPT',
-          confidence: 0.96,
-          rationale: 'Standing knee radiographs ordered for joint space narrowing.',
-        },
-      ],
-      medication_codes: [
-        {
-          code: 'RxNorm:849727',
-          description: 'Meloxicam 15 MG Oral Tablet',
-          category: 'RxNorm',
-          confidence: 0.99,
-          rationale: 'Active prescription order in encounter plan.',
-        },
-      ],
-      total_billable_units: 2,
-      medical_decision_making_level: 'Moderate Complexity (Level 4 - 99214)',
-    };
+      body: JSON.stringify({
+        clinical_text: payload.clinicalText,
+        patient_id: payload.patientId,
+        encounter_id: payload.encounterId,
+      }),
+    });
+    if (!resp.ok) {
+      throw new Error(`Medical coding extraction failed (HTTP ${resp.status})`);
+    }
+    return await resp.json();
   },
 
   /**
@@ -1301,55 +1130,27 @@ export const clinixApi = {
     summaryType = 'visit_summary',
     modelName?: string
   ): Promise<PatientReport> {
-    try {
-      const resp = await fetch(`${getApiBaseUrl()}/api/v1/summarize/patient`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: 'Bearer vault-local-admin-token',
-        },
-        body: JSON.stringify({
-          clinical_text: clinicalText,
-          report_type: summaryType,
-          model_name: modelName,
-        }),
-      });
-      if (resp.ok) {
-        const data = await resp.json();
-        if (data.patient_report) {
-          return data.patient_report;
-        }
-      }
-    } catch {
-      // fallback
+    const resp = await fetch(`${getApiBaseUrl()}/api/v1/summarize/patient`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer vault-local-admin-token',
+      },
+      body: JSON.stringify({
+        clinical_text: clinicalText,
+        report_type: summaryType,
+        model_name: modelName,
+      }),
+    });
+    if (!resp.ok) {
+      const err = await resp.text().catch(() => '');
+      throw new Error(`Patient summary generation failed (HTTP ${resp.status}): ${err || 'Clinical LLM service unavailable'}`);
     }
-    return {
-      headline: "Summary of your clinic visit and care plan explained in everyday words.",
-      what_was_examined: "Your symptoms, vital signs, physical exam, and doctor consultation.",
-      doctor_explanation: "Hello! Here is a summary of our visit today. We discussed your symptoms and agreed on a step-by-step plan to help you feel better and recover smoothly.",
-      key_findings: [
-        "Vitals: Stable vital signs recorded during your appointment.",
-        "Discussion: Reviewed your health history and current symptoms."
-      ],
-      what_it_means: "We have a clear path forward with your medications and therapies.",
-      next_steps: [
-        "Take all medications as directed on the label.",
-        "Stay hydrated and get plenty of rest.",
-        "Call our clinic if you have any questions or feel worse."
-      ],
-      jargon_translations: [
-        {
-          medical_term: "Follow-up",
-          simple_meaning: "Next visit to see your progress",
-          context: "A check-in to make sure your treatment is working."
-        }
-      ],
-      questions_for_doctor: [
-        "What are the main warning signs I should watch out for?",
-        "How quickly should I expect to feel an improvement?"
-      ],
-      reading_level: "Grade 6 (Plain Language Certified)",
-    };
+    const data = await resp.json();
+    if (data.patient_report) {
+      return data.patient_report;
+    }
+    throw new Error(data.error || 'Backend did not return a valid patient report');
   },
 
   /**
@@ -1372,8 +1173,8 @@ export const clinixApi = {
       mode: 'air_gapped_in_memory',
       connected: false,
       uri: 'bolt://localhost:7687',
-      node_count: 24,
-      relationship_count: 36,
+      node_count: 0,
+      relationship_count: 0,
       engine: 'Air-Gapped Sovereign Property Graph Engine (NetworkX MultiDiGraph)',
     };
   },

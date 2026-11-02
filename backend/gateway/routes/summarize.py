@@ -166,9 +166,12 @@ async def summarize_clinical_text(
     start_time = time.time()
 
     # Ensure patient exists or link to active cohort patient
-    patient = db.query(Patient).filter((Patient.id == request.patient_id) | (Patient.mrn == request.patient_id)).first()
+    patient = None
+    if request.patient_id:
+        patient = db.query(Patient).filter((Patient.id == request.patient_id) | (Patient.mrn == request.patient_id)).first()
     if not patient:
         patient = db.query(Patient).order_by(Patient.created_at.asc()).first()
+    target_patient_id = patient.id if patient else (request.patient_id or "ANONYMOUS")
 
     summary_text = ""
     key_findings = []
@@ -431,9 +434,12 @@ async def summarize_clinical_document(
     start_time = time.time()
 
     # Ensure patient exists or link to active cohort patient
-    patient = db.query(Patient).filter((Patient.id == request.patient_id) | (Patient.mrn == request.patient_id)).first()
+    patient = None
+    if request.patient_id:
+        patient = db.query(Patient).filter((Patient.id == request.patient_id) | (Patient.mrn == request.patient_id)).first()
     if not patient:
         patient = db.query(Patient).order_by(Patient.created_at.asc()).first()
+    target_patient_id = patient.id if patient else (request.patient_id or "ANONYMOUS")
 
     extracted_text = ""
     sections = {}
@@ -637,7 +643,7 @@ async def summarize_clinical_document(
     # Print High-Visibility Verbose Inference Telemetry
     print_verbose_summarization_log(
         workflow_title="Multi-Modal Clinical Document OCR & Synthesis",
-        patient_id=request.patient_id,
+        patient_id=target_patient_id,
         summary_type=request.summary_type,
         model_name=model_version,
         latency_ms=latency_ms,
@@ -660,7 +666,7 @@ async def summarize_clinical_document(
 
     return GatewayDocumentSummarizeResponse(
         summary_id=report_id,
-        patient_id=request.patient_id,
+        patient_id=target_patient_id,
         summary=summary_text,
         sections=sections,
         key_findings=key_findings,

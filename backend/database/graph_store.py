@@ -84,15 +84,6 @@ class ClinicalGraphStore:
                 pass
 
         if not resolved_name or resolved_name == "Clinical Patient":
-            from backend.gateway.routes.patients import DEFAULT_COHORT
-            for c in DEFAULT_COHORT:
-                if c["id"] == patient_id or c["mrn"] == patient_id:
-                    resolved_name = f"{c['first_name']} {c['last_name']}"
-                    resolved_gender = c["gender"]
-                    resolved_mrn = c["mrn"]
-                    break
-
-        if not resolved_name or resolved_name == "Clinical Patient":
             resolved_name = f"Patient {patient_id}"
 
         self.manager.add_node(

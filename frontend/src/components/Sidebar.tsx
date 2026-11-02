@@ -192,11 +192,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badge: 'DOC-AI',
     },
     {
-      id: 'microservices',
-      label: 'Microservices & Health',
-      icon: <Server className="w-4 h-4" />,
-    },
-    {
       id: 'hardware',
       label: 'Hardware & Turnkey Sizing',
       icon: <Cpu className="w-4 h-4" />,

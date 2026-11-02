@@ -3033,40 +3033,37 @@ export const RadiologyStudioPage: React.FC<RadiologyStudioPageProps> = ({ onOpen
               ) : (
                 /* Mode 2: Patient-Facing Lay Audience Report */
                 <div className="mt-2">
-                  <PatientReportView
-                    report={selectedCase.patientReport || {
-                      headline: "Your diagnostic study has been thoroughly evaluated by our clinical AI and physician team.",
-                      what_was_examined: selectedCase.view,
-                      doctor_explanation: `Hello ${selectedCase.patient}! We reviewed your diagnostic imaging. The results show that your major organs and structures are stable without acute emergencies or active infections.`,
-                      key_findings: [
-                        "Main structures inspected without active emergency.",
-                        "No acute fractures or dangerous collections detected."
-                      ],
-                      what_it_means: "Your results are reassuring and provide a clear baseline for your doctor to guide your ongoing care.",
-                      next_steps: [
-                        "Continue taking your current medications exactly as prescribed.",
-                        "Attend your scheduled follow-up appointment for ongoing monitoring."
-                      ],
-                      jargon_translations: [
-                        {
-                          medical_term: "Within Normal Limits",
-                          simple_meaning: "Completely healthy and normal",
-                          context: "Standard healthy baseline for your age."
-                        }
-                      ],
-                      questions_for_doctor: [
-                        "Do these results explain the symptoms I have been experiencing?",
-                        "When should we schedule our next check-up?"
-                      ],
-                      reading_level: "Grade 6 (Plain Language Certified)"
-                    }}
-                    patientName={selectedCase.patient}
-                    studyTitle={selectedCase.view}
-                    doctorName="Dr. Amanda Chen, MD (CMIO)"
-                    dateStr="Today, 11:30 AM"
-                    isGenerating={isGenerating}
-                    onRefresh={handleGenerateReport}
-                  />
+                  {selectedCase.patientReport ? (
+                    <PatientReportView
+                      report={selectedCase.patientReport}
+                      patientName={selectedCase.patient}
+                      studyTitle={selectedCase.view}
+                      doctorName="Attending Radiologist"
+                      dateStr="Today"
+                      isGenerating={isGenerating}
+                      onRefresh={handleGenerateReport}
+                    />
+                  ) : (
+                    <div className="p-8 text-center bg-slate-50 dark:bg-slate-800/40 border border-dashed border-slate-200 dark:border-slate-700 rounded-2xl space-y-3">
+                      <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-clinical-blue mx-auto flex items-center justify-center">
+                        <FileText className="w-5 h-5" />
+                      </div>
+                      <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                        No Patient-Facing Report Generated Yet
+                      </h4>
+                      <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
+                        Analyze this radiograph study with our clinical vision engine to generate a plain-language lay report.
+                      </p>
+                      <button
+                        onClick={handleGenerateReport}
+                        disabled={isGenerating}
+                        className="px-3.5 py-1.5 rounded-xl bg-clinical-blue text-white text-xs font-bold hover:bg-blue-700 transition-all cursor-pointer shadow-sm inline-flex items-center gap-1.5"
+                      >
+                        {isGenerating ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                        <span>{isGenerating ? 'Generating Analysis...' : 'Generate Clinical & Lay Report'}</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

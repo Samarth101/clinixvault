@@ -34,93 +34,20 @@ provenance_tracker = ProvenanceTracker()
 # In-memory metadata cache for dynamically registered patients
 DYNAMIC_PATIENT_METADATA: Dict[str, Dict[str, Any]] = {}
 
-# Default clinical cohort for air-gapped demo roster
-DEFAULT_COHORT = [
-    {
-        "id": "ENC-9082",
-        "mrn": "MRN-782194",
-        "first_name": "Eleanor",
-        "last_name": "Vance",
-        "dob": "1968-04-12",
-        "gender": "female",
-        "chief_complaint": "Bilateral progressive knee pain, worse on weight bearing",
-        "exam_room": "Exam Room 3",
-        "status": "In Progress",
-        "vitals": {"bp": "128/82 mmHg", "hr": "72 bpm", "spo2": "99%", "temp": "98.4°F", "bmi": "27.4 kg/m²"},
-    },
-    {
-        "id": "ENC-9081",
-        "mrn": "MRN-642109",
-        "first_name": "Robert",
-        "last_name": "Kowalski",
-        "dob": "1954-11-29",
-        "gender": "male",
-        "chief_complaint": "Follow-up congestive heart failure and mild exertional dyspnea",
-        "exam_room": "Exam Room 1",
-        "status": "Ready for Review",
-        "vitals": {"bp": "134/88 mmHg", "hr": "68 bpm", "spo2": "96%", "temp": "98.6°F", "bmi": "29.1 kg/m²"},
-    },
-    {
-        "id": "ENC-9080",
-        "mrn": "MRN-551028",
-        "first_name": "Sarah",
-        "last_name": "Jenkins",
-        "dob": "1982-08-17",
-        "gender": "female",
-        "chief_complaint": "Persistent dry cough post-viral syndrome, 3 weeks duration",
-        "exam_room": "Exam Room 4",
-        "status": "Committed",
-        "vitals": {"bp": "116/74 mmHg", "hr": "76 bpm", "spo2": "98%", "temp": "98.2°F", "bmi": "23.5 kg/m²"},
-    },
-    {
-        "id": "ENC-9079",
-        "mrn": "MRN-893012",
-        "first_name": "Marcus",
-        "last_name": "Rodriguez",
-        "dob": "1991-03-22",
-        "gender": "male",
-        "chief_complaint": "Acute twisting injury to left knee during athletics, painful clicking",
-        "exam_room": "Exam Room 2",
-        "status": "Ready for Review",
-        "vitals": {"bp": "122/78 mmHg", "hr": "64 bpm", "spo2": "99%", "temp": "98.5°F", "bmi": "25.1 kg/m²"},
-    },
-    {
-        "id": "ENC-9078",
-        "mrn": "MRN-410982",
-        "first_name": "Elena",
-        "last_name": "Rostova",
-        "dob": "1960-07-09",
-        "gender": "female",
-        "chief_complaint": "Chronic lumbar radiculopathy radiating down right posterior thigh",
-        "exam_room": "Exam Room 5",
-        "status": "Committed",
-        "vitals": {"bp": "130/84 mmHg", "hr": "70 bpm", "spo2": "97%", "temp": "98.3°F", "bmi": "26.8 kg/m²"},
-    },
-]
-
-
-def ensure_demo_patients_seeded(db: Session):
-    """No-op: Demo cohort seeding disabled. Operates with genuine zero records until a patient is added."""
-    pass
-
 
 @router.get("", response_model=List[PatientRosterItem])
 async def list_patients(db: Session = Depends(get_db)):
     """
     Returns clinical patient roster with encounter counts, latest encounter, and vitals.
     """
-    ensure_demo_patients_seeded(db)
     patients = db.query(Patient).order_by(Patient.created_at.desc()).all()
-    
     roster: List[PatientRosterItem] = []
-    cohort_lookup = {item["id"]: item for item in DEFAULT_COHORT}
-    cohort_mrn_lookup = {item["mrn"]: item for item in DEFAULT_COHORT}
 
     for p in patients:
         encounters = db.query(Encounter).filter(Encounter.patient_id == p.id).order_by(Encounter.started_at.desc()).all()
         enc_count = len(encounters)
         
-        meta = DYNAMIC_PATIENT_METADATA.get(p.id) or DYNAMIC_PATIENT_METADATA.get(p.mrn) or cohort_lookup.get(p.id) or cohort_mrn_lookup.get(p.mrn) or {}
+        meta = DYNAMIC_PATIENT_METADATA.get(p.id) or DYNAMIC_PATIENT_METADATA.get(p.mrn) or {}
         vitals_dict = meta.get("vitals", {
             "bp": "120/80 mmHg",
             "hr": "72 bpm",
@@ -295,10 +222,6 @@ async def get_patient_detail(patient_id: str, db: Session = Depends(get_db)):
     """
     patient = db.query(Patient).filter((Patient.id == patient_id) | (Patient.mrn == patient_id)).first()
     if not patient:
-        ensure_demo_patients_seeded(db)
-        patient = db.query(Patient).filter((Patient.id == patient_id) | (Patient.mrn == patient_id)).first()
-
-    if not patient:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Patient '{patient_id}' not found.",
@@ -307,7 +230,7 @@ async def get_patient_detail(patient_id: str, db: Session = Depends(get_db)):
     encounters = db.query(Encounter).filter(Encounter.patient_id == patient.id).order_by(Encounter.started_at.desc()).all()
     reports = db.query(ClinicalReport).filter(ClinicalReport.patient_id == patient.id).order_by(ClinicalReport.created_at.desc()).all()
 
-    meta = DYNAMIC_PATIENT_METADATA.get(patient.id) or DYNAMIC_PATIENT_METADATA.get(patient.mrn) or next((item for item in DEFAULT_COHORT if item["id"] == patient.id or item["mrn"] == patient.mrn), {})
+    meta = DYNAMIC_PATIENT_METADATA.get(patient.id) or DYNAMIC_PATIENT_METADATA.get(patient.mrn) or {}
     vitals_dict = meta.get("vitals", {"bp": "120/80 mmHg", "hr": "72 bpm", "spo2": "98%", "temp": "98.6°F", "bmi": "24.5 kg/m²"})
 
     enc_items = [
@@ -363,17 +286,13 @@ async def get_patient_encounters(patient_id: str, db: Session = Depends(get_db))
     """
     patient = db.query(Patient).filter((Patient.id == patient_id) | (Patient.mrn == patient_id)).first()
     if not patient:
-        ensure_demo_patients_seeded(db)
-        patient = db.query(Patient).filter((Patient.id == patient_id) | (Patient.mrn == patient_id)).first()
-
-    if not patient:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Patient '{patient_id}' not found.",
         )
 
     encounters = db.query(Encounter).filter(Encounter.patient_id == patient.id).order_by(Encounter.started_at.desc()).all()
-    meta = DYNAMIC_PATIENT_METADATA.get(patient.id) or DYNAMIC_PATIENT_METADATA.get(patient.mrn) or next((item for item in DEFAULT_COHORT if item["id"] == patient.id or item["mrn"] == patient.mrn), {})
+    meta = DYNAMIC_PATIENT_METADATA.get(patient.id) or DYNAMIC_PATIENT_METADATA.get(patient.mrn) or {}
     vitals_dict = meta.get("vitals", {"bp": "120/80 mmHg", "hr": "72 bpm", "spo2": "98%", "temp": "98.6°F", "bmi": "24.5 kg/m²"})
 
     return [
@@ -398,10 +317,6 @@ async def get_patient_reports(patient_id: str, db: Session = Depends(get_db)):
     Returns all clinical reports for a patient with joined cryptographic provenance records.
     """
     patient = db.query(Patient).filter((Patient.id == patient_id) | (Patient.mrn == patient_id)).first()
-    if not patient:
-        ensure_demo_patients_seeded(db)
-        patient = db.query(Patient).filter((Patient.id == patient_id) | (Patient.mrn == patient_id)).first()
-
     if not patient:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -454,10 +369,6 @@ async def create_patient_encounter(
     Creates a new clinical encounter for a patient.
     """
     patient = db.query(Patient).filter((Patient.id == patient_id) | (Patient.mrn == patient_id)).first()
-    if not patient:
-        ensure_demo_patients_seeded(db)
-        patient = db.query(Patient).filter((Patient.id == patient_id) | (Patient.mrn == patient_id)).first()
-
     if not patient:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

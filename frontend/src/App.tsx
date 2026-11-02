@@ -17,7 +17,6 @@ import { ProvenanceFHIRPage } from './pages/ProvenanceFHIRPage';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { RadiologyStudioPage } from './pages/RadiologyStudioPage';
 import { DocumentSummarizerPage } from './pages/DocumentSummarizerPage';
-import { MicroservicesHealthPage } from './pages/MicroservicesHealthPage';
 import { HardwareSizingPage } from './pages/HardwareSizingPage';
 import { StaffManagementPage } from './pages/StaffManagementPage';
 import { KnowledgeGraphPage } from './pages/KnowledgeGraphPage';
@@ -27,7 +26,7 @@ import { PatientsPage } from './pages/PatientsPage';
 import { AuthProvider } from './context/AuthContext';
 import { LoginModal } from './components/LoginModal';
 
-const VALID_PAGES: PageId[] = ['landing', 'overview', 'patients', 'provenance', 'radiology', 'summarizer', 'microservices', 'hardware', 'staff', 'graph'];
+const VALID_PAGES: PageId[] = ['landing', 'overview', 'patients', 'provenance', 'radiology', 'summarizer', 'hardware', 'staff', 'graph'];
 
 function getPageFromHash(): PageId {
   const hash = window.location.hash.replace(/^#\/?/, '').toLowerCase() as PageId;
@@ -264,18 +263,6 @@ export const App: React.FC = () => {
                       transition={{ duration: 0.25, ease: "easeOut" }}
                     >
                       <DocumentSummarizerPage />
-                    </motion.div>
-                  )}
-
-                  {activePage === 'microservices' && (
-                    <motion.div
-                      key="microservices"
-                      initial={{ opacity: 0, y: 12 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -12 }}
-                      transition={{ duration: 0.25, ease: "easeOut" }}
-                    >
-                      <MicroservicesHealthPage />
                     </motion.div>
                   )}
 

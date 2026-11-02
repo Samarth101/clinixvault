@@ -14,7 +14,6 @@ import {
   Building2
 } from 'lucide-react';
 import { EncounterSummary, PatientReport } from '../types';
-import { ENCOUNTER_PROFILES } from '../data/encounterProfiles';
 import { useAuth } from '../context/useAuth';
 
 interface ClinicalExportModalProps {
@@ -59,9 +58,8 @@ export const ClinicalExportModal: React.FC<ClinicalExportModalProps> = ({
   }, [createdTimestamp]);
 
   // Resolve active encounter or default placeholder
-  const defaultProfile = ENCOUNTER_PROFILES['ENC-9082'];
   const activeEncounter = encounter || {
-    id: "ENC-NEW",
+    id: "ENC-ACTIVE",
     patientName: "Active Patient",
     mrn: "MRN-PENDING",
     dob: "N/A",
@@ -78,9 +76,32 @@ export const ClinicalExportModal: React.FC<ClinicalExportModalProps> = ({
     },
   };
 
-  const matchedProfile = ENCOUNTER_PROFILES[activeEncounter.id] || defaultProfile;
-  const soap = customSoap || matchedProfile.soap;
-  const patientReport = customPatientReport || matchedProfile.patientReport;
+  const soap = customSoap || {
+    subjective: "Patient presented for clinical consultation.",
+    objective: "Vital signs recorded. Physical examination documented.",
+    assessment: "1. Clinical evaluation completed.",
+    plan: "1. Supportive care and medical management as reviewed.",
+  };
+
+  const defaultPatientReport: PatientReport = {
+    headline: "Clinical encounter documentation and care plan.",
+    what_was_examined: activeEncounter.chiefComplaint,
+    doctor_explanation: `Care plan reviewed with ${activeEncounter.patientName}. Vital signs and symptoms evaluated.`,
+    key_findings: [
+      `Chief Complaint: ${activeEncounter.chiefComplaint}`,
+      `Recorded Vitals: BP ${activeEncounter.vitals.bp}, HR ${activeEncounter.vitals.hr}, SpO2 ${activeEncounter.vitals.spo2}`,
+    ],
+    what_it_means: "Your consultation was documented in your sovereign electronic medical record.",
+    next_steps: [
+      "Follow prescribed medical guidance and care instructions.",
+      "Attend scheduled clinic follow-up.",
+    ],
+    jargon_translations: [],
+    questions_for_doctor: [],
+    reading_level: "Grade 6 (Plain Language Certified)",
+  };
+
+  const patientReport = customPatientReport || defaultPatientReport;
 
   const sha256Digest = `8f4b1e9d2c3a5078${activeEncounter.id.replace(/[^0-9]/g, '')}f67a8b9c0d1e2f3a4b5c6d7e8f90123456789abcdef0`;
 

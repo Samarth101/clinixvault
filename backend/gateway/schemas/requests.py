@@ -92,7 +92,7 @@ class MedicalCodeItem(BaseModel):
 
 class CodingExtractionRequest(BaseModel):
     clinical_text: str
-    patient_id: Optional[str] = "ENC-9082"
+    patient_id: Optional[str] = None
     encounter_id: Optional[str] = None
 
 
@@ -145,7 +145,7 @@ class PatientSimplifyResponse(BaseModel):
 
 
 class GatewayDocumentSummarizeRequest(BaseModel):
-    patient_id: str = "ENC-9082"
+    patient_id: Optional[str] = None
     encounter_id: Optional[str] = None
     document_base64: Optional[str] = None
     clinical_text: Optional[str] = None

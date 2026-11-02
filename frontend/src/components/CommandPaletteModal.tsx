@@ -63,7 +63,6 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
           { id: 'provenance', label: 'Bi-Directional Provenance & FHIR Hub', icon: <Binary className="w-4 h-4 text-emerald-500" />, action: () => { onSelectPage('provenance'); onClose(); } },
           { id: 'graph', label: 'Clinical Knowledge Graph & Neo4j Ontological Mesh', icon: <Network className="w-4 h-4 text-indigo-500" />, action: () => { onSelectPage('graph'); onClose(); } },
           { id: 'radiology', label: 'Radiology VLM Multi-Modal Studio', icon: <Scan className="w-4 h-4 text-purple-500" />, action: () => { onSelectPage('radiology'); onClose(); } },
-          { id: 'microservices', label: 'Microservices & K3s Pod Telemetry', icon: <Server className="w-4 h-4 text-sky-500" />, action: () => { onSelectPage('microservices'); onClose(); } },
           { id: 'hardware', label: 'Hardware Sizing & Turnkey Appliance', icon: <Cpu className="w-4 h-4 text-indigo-500" />, action: () => { onSelectPage('hardware'); onClose(); } },
           { id: 'staff', label: 'Staff & Providers Directory (RBAC)', icon: <Users className="w-4 h-4 text-blue-500" />, action: () => { onSelectPage('staff'); onClose(); } },
         ]

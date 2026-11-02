@@ -70,7 +70,7 @@ export const DocumentSummarizerPage: React.FC = () => {
       const res = await clinixApi.summarizeDocument(
         undefined,
         inputText,
-        'ENC-9082',
+        undefined,
         'discharge',
         selectedModel
       );

@@ -486,7 +486,7 @@ const DEMO_SCENARIOS: DemoScenario[] = [
           </div>
         ),
         actions: [
-          { label: 'Inspect Telemetry Microservice', targetPage: 'microservices', variant: 'primary' },
+          { label: 'Inspect Telemetry Hardware', targetPage: 'hardware', variant: 'primary' },
           { label: 'Acknowledge Alarm in Audit Log', targetPage: 'overview', variant: 'secondary' }
         ]
       }
@@ -943,9 +943,9 @@ const AtlasConnectedTools: React.FC<{ onLaunchWorkstation: (targetPage?: PageId)
     { name: 'Cerner Millennium', category: 'Inpatient CPOE', badge: 'CRN', color: '#0284c7', page: 'overview' as PageId },
     { name: 'FHIR R4 Store', category: 'Local Provenance', badge: 'FHIR', color: '#ea580c', page: 'provenance' as PageId },
     { name: 'PACS / DICOM', category: 'Orthanc Radiology', badge: 'DCM', color: '#059669', page: 'radiology' as PageId },
-    { name: 'PyTorch / CUDA', category: 'On-Prem Inference', badge: 'TORCH', color: '#e11d48', page: 'microservices' as PageId },
+    { name: 'PyTorch / CUDA', category: 'On-Prem Inference', badge: 'TORCH', color: '#e11d48', page: 'hardware' as PageId },
     { name: 'vLLM Kernel', category: 'AWQ 4-Bit Acceleration', badge: 'VLLM', color: '#4f46e5', page: 'hardware' as PageId },
-    { name: 'PostgreSQL Timescale', category: 'Encrypted Vitals Audit', badge: 'PG', color: '#2563eb', page: 'microservices' as PageId },
+    { name: 'PostgreSQL Timescale', category: 'Encrypted Vitals Audit', badge: 'PG', color: '#2563eb', page: 'provenance' as PageId },
     { name: 'Dante IP Audio', category: 'Ceiling Array Transcripts', badge: 'DNT', color: '#0d9488', page: 'staff' as PageId }
   ];
 
@@ -1009,7 +1009,7 @@ const AtlasConnectedTools: React.FC<{ onLaunchWorkstation: (targetPage?: PageId)
 
             {/* Central Robot Core Node */}
             <div 
-              onClick={() => onLaunchWorkstation('microservices')}
+              onClick={() => onLaunchWorkstation('hardware')}
               className="relative z-10 size-28 rounded-full bg-white shadow-[0_12px_36px_rgba(0,0,0,0.12)] border border-black/10 flex flex-col items-center justify-center cursor-pointer hover:scale-105 transition-transform group"
             >
               <img
@@ -1417,7 +1417,7 @@ const AtlasBuildTeam: React.FC<{ onLaunchWorkstation: (targetPage?: PageId) => v
         'Integrations: Philips IntelliVue, Dante IP Audio, TimescaleDB',
         'Trigger: Continuous scoring at 100 Hz; broadcasts alert on MEWS >= 5'
       ],
-      targetPage: 'microservices' as PageId
+      targetPage: 'overview' as PageId
     },
     {
       id: 'handoverbot',
@@ -2079,7 +2079,7 @@ const AtlasFooter: React.FC<{ onLaunchWorkstation: (targetPage?: PageId) => void
     { label: 'Workstation Overview', page: 'overview' },
     { label: 'FHIR Provenance', page: 'provenance' },
     { label: 'Radiology DICOM', page: 'radiology' },
-    { label: 'Microservices Health', page: 'microservices' },
+    { label: 'Patient Directory', page: 'patients' },
     { label: 'Hardware Sizing', page: 'hardware' },
     { label: 'Staff Roster', page: 'staff' },
   ];
