@@ -1196,7 +1196,7 @@ export const RadiologyStudioPage: React.FC<RadiologyStudioPageProps> = ({ onOpen
               Radiology VLM Studio
             </h1>
             <p className="text-slate-600 text-sm mt-2.5 max-w-2xl leading-relaxed">
-              Institutional multi-modal diagnostic radiograph viewer and clinical vision-language interpreter engineered for zero-egress hospital PACS integration. Features real-time multi-window DICOM visualization, hardware-accelerated local inference, calibrated diagnostic pathology scoring, and verifiable cryptographic FHIR R4 provenance.
+              Diagnostic imaging workspace with multi-window DICOM visualization, automated anatomical findings interpretation, and cryptographic provenance validation.
             </p>
           </div>
 

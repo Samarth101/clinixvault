@@ -117,3 +117,27 @@ class ProvenanceRecord(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     report = relationship("ClinicalReport", back_populates="provenance")
+
+
+class Clinician(Base):
+    __tablename__ = "clinicians"
+
+    id = Column(String(64), primary_key=True, default=generate_uuid)
+    name = Column(String(128), nullable=False)
+    role = Column(String(64), default="Attending Physician")
+    title = Column(String(64), default="Licensed Clinician")
+    department = Column(String(64), default="Internal Medicine")
+    specialty = Column(String(64), default="Clinical Medicine")
+    npi = Column(String(64), nullable=True)
+    email = Column(String(128), nullable=True)
+    access_tier = Column(String(64), default="Tier 1 — Executive/Attending")
+    break_glass_authorized = Column(Boolean, default=False)
+    sso_status = Column(String(64), default="Active Directory Synced")
+    status = Column(String(32), default="Active")
+    assigned_node = Column(String(64), default="CV-NODE-01 (Exam 1-4)")
+    badge_id = Column(String(64), nullable=True)
+    auth_method = Column(String(64), default="Keycloak Active Directory SSO")
+    avatar_initials = Column(String(8), default="MD")
+    is_active = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+

@@ -269,3 +269,44 @@ class ReportProvenanceResponse(BaseModel):
     created_at: Optional[str] = None
     provenance: Optional[Dict[str, Any]] = None
 
+
+class ClinicianCreateRequest(BaseModel):
+    id: Optional[str] = None
+    name: str
+    role: Optional[str] = "Attending Physician"
+    title: Optional[str] = "Licensed Clinician"
+    department: Optional[str] = "Internal Medicine"
+    specialty: Optional[str] = "Clinical Medicine"
+    npi: Optional[str] = None
+    email: Optional[str] = None
+    access_tier: Optional[str] = "Tier 1 — Executive/Attending"
+    break_glass_authorized: Optional[bool] = False
+    sso_status: Optional[str] = "Active Directory Synced"
+    status: Optional[str] = "Active"
+    assigned_node: Optional[str] = "CV-NODE-01 (Exam 1-4)"
+    badge_id: Optional[str] = None
+    auth_method: Optional[str] = "Keycloak Active Directory SSO"
+    avatar_initials: Optional[str] = "MD"
+
+
+class ClinicianResponse(BaseModel):
+    id: str
+    name: str
+    role: str
+    title: str
+    department: str
+    specialty: Optional[str] = "Clinical Medicine"
+    npi: Optional[str] = None
+    email: Optional[str] = None
+    access_tier: Optional[str] = "Tier 1 — Executive/Attending"
+    break_glass_authorized: bool = False
+    sso_status: Optional[str] = "Active Directory Synced"
+    status: str = "Active"
+    assigned_node: Optional[str] = "CV-NODE-01 (Exam 1-4)"
+    badge_id: Optional[str] = None
+    auth_method: str = "Keycloak Active Directory SSO"
+    avatar_initials: str = "MD"
+    is_active: bool = False
+    created_at: Optional[str] = None
+
+

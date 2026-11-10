@@ -15,6 +15,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   useEffect(() => {
+    void authService.syncFromDatabase().then(() => {
+      refreshUsers();
+    });
     window.addEventListener('clinixvault:clinicians_updated', refreshUsers);
     window.addEventListener('clinixvault:user_updated', refreshUsers);
     return () => {

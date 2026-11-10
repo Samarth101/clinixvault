@@ -223,7 +223,7 @@ MRN:                  ${activeEncounter.mrn}
 Demographics:         ${activeEncounter.dob}
 Exam Date:            ${exportDate}
 Location:             ${activeEncounter.examRoom}
-Attending Clinician:  ${currentUser.name} (CMIO)
+Attending Clinician:  ${currentUser.name} (${currentUser.role || 'Attending Physician'})
 Encounter Status:     ${activeEncounter.status}
 Chief Complaint:      ${activeEncounter.chiefComplaint}
 --------------------------------------------------------------------------------
@@ -258,7 +258,7 @@ Verification:         HIPAA §164.312(c)(1) Integrity Mechanism Certified
 PATIENT AFTER VISIT SUMMARY & HEALTH CARE GUIDE
 Prepared for: ${activeEncounter.patientName}
 Date of Visit: ${exportDate}
-Physician: Dr. Amanda Chen, MD
+Physician: ${currentUser.name}
 ================================================================================
 SUMMARY OF YOUR VISIT:
 ${patientReport.headline}

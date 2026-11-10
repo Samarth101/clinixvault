@@ -34,7 +34,7 @@ const HeaderClock: React.FC = React.memo(() => {
   }, []);
 
   return (
-    <div className="flex items-center gap-1.5 px-3 py-2 rounded-2xl bg-white/80 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-mono shadow-sm shrink-0">
+    <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-[11px] font-mono shadow-xs shrink-0 whitespace-nowrap">
       <Clock className="w-3.5 h-3.5 text-slate-400" />
       <span className="font-bold">{time}</span>
     </div>
@@ -95,54 +95,52 @@ export const HeaderBar: React.FC<HeaderBarProps> = React.memo(({
 
   return (
     <>
-    <header className="w-full glass-card px-4 sm:px-6 py-2.5 mb-3 shrink-0 flex items-center justify-between gap-3 border border-white/90 dark:border-slate-800 shadow-diffuse z-40 backdrop-blur-3xl bg-white/85 dark:bg-slate-900/85 transition-all duration-200 overflow-x-auto scrollbar-hide">
+    <header className="w-full glass-card px-2.5 sm:px-4 py-2 mb-3 shrink-0 flex items-center justify-between gap-1.5 sm:gap-2.5 border border-white/90 dark:border-slate-800 shadow-diffuse z-40 backdrop-blur-3xl bg-white/85 dark:bg-slate-900/85 transition-all duration-200 overflow-x-hidden flex-nowrap">
       {/* Brand & Clinician Session */}
-      <div className="flex items-center gap-5">
+      <div className="flex items-center gap-2 sm:gap-3 shrink min-w-0">
         <div 
           onClick={onNavigateLanding}
-          className="flex items-center gap-3.5 cursor-pointer group"
+          className="flex items-center gap-2 cursor-pointer group shrink-0"
           title="Return to Landing Page & Showcase"
         >
-          <div className="w-11 h-11 rounded-2xl bg-blue-50/80 dark:bg-slate-800 border border-blue-100 dark:border-slate-700 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0 shadow-xs" title="ClinixVault Sovereign Monolith">
-            <ClinicVaultLogoSVG size={34} />
+          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-blue-50/80 dark:bg-slate-800 border border-blue-100 dark:border-slate-700 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0 shadow-xs" title="ClinixVault Sovereign Monolith">
+            <ClinicVaultLogoSVG size={26} />
           </div>
           <div>
-            <div className="flex items-center gap-2.5">
-              <h1 className="text-xl font-extrabold tracking-tight text-slate-900 dark:text-white font-sans">
+            <div className="flex items-center gap-1.5">
+              <h1 className="text-sm sm:text-base xl:text-lg font-extrabold tracking-tight text-slate-900 dark:text-white font-sans whitespace-nowrap">
                 ClinixVault<span className="text-clinical-blue font-black">.Enterprise</span>
               </h1>
-              <span className="px-2.5 py-0.5 text-[11px] font-bold bg-blue-50 dark:bg-blue-900/40 text-clinical-blue dark:text-blue-300 rounded-full border border-blue-200/80 dark:border-blue-800 font-mono shadow-sm">
+              <span className="hidden sm:inline px-1.5 py-0.5 text-[9px] sm:text-[10px] font-bold bg-blue-50 dark:bg-blue-900/40 text-clinical-blue dark:text-blue-300 rounded-full border border-blue-200/80 dark:border-blue-800 font-mono shadow-xs whitespace-nowrap">
                 {currentUser.firmware}
               </span>
             </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
-              Zero-Egress Air-Gapped Clinical AI Appliance • {currentUser.location}
+            <p className="hidden 2xl:block text-[11px] text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap">
+              Zero-Egress Air-Gapped Appliance • {currentUser.location}
             </p>
           </div>
         </div>
 
-        <div className="hidden lg:block h-8 w-[1px] bg-slate-200/80 dark:bg-slate-700/80" />
+        <div className="hidden lg:block h-6 w-[1px] bg-slate-200/80 dark:bg-slate-700/80 shrink-0" />
 
         {/* Doctor Persona Card with Interactive Dropdown */}
-        <div className="relative">
+        <div className="relative shrink-0">
           <button 
             onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-            className="hidden sm:flex items-center gap-3 bg-slate-50/90 dark:bg-slate-800/80 hover:bg-slate-100/90 dark:hover:bg-slate-700/80 px-4 py-2 rounded-2xl border border-slate-200/70 dark:border-slate-700/70 shadow-sm transition-all cursor-pointer text-left"
+            className="flex items-center gap-1.5 sm:gap-2 bg-slate-50/90 dark:bg-slate-800/80 hover:bg-slate-100/90 dark:hover:bg-slate-700/80 px-2 sm:px-2.5 py-1.5 rounded-xl border border-slate-200/70 dark:border-slate-700/70 shadow-xs transition-all cursor-pointer text-left"
             title="Clinician Account & Profile"
           >
-            <div className="w-8 h-8 rounded-xl bg-clinical-blue text-white flex items-center justify-center font-bold text-xs shadow-sm">
+            <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-clinical-blue text-white flex items-center justify-center font-bold text-[11px] sm:text-xs shadow-xs shrink-0">
               {currentUser.avatarInitials || 'MD'}
             </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold text-slate-900 dark:text-white">{currentUser.name}</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400 ml-0.5" />
+            <div className="max-w-[85px] sm:max-w-[130px] xl:max-w-[160px] truncate">
+              <div className="flex items-center gap-1">
+                <span className="text-xs font-bold text-slate-900 dark:text-white truncate">{currentUser.name}</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                <ChevronDown className="w-3 h-3 text-slate-400 shrink-0 ml-0.5" />
               </div>
-              <div className="flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400 font-medium">
-                <span className="text-clinical-blue dark:text-blue-400 font-semibold">{currentUser.role}</span>
-                <span>•</span>
-                <span className="font-mono">{currentUser.npi}</span>
+              <div className="flex items-center gap-1 text-[10px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                <span className="text-clinical-blue dark:text-blue-400 font-semibold truncate">{currentUser.role}</span>
               </div>
             </div>
           </button>
@@ -238,13 +236,13 @@ export const HeaderBar: React.FC<HeaderBarProps> = React.memo(({
       </div>
 
       {/* Edge Metrics, Utility Controls & Air-Gap Telemetry */}
-      <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+      <div className="flex items-center gap-1 sm:gap-1.5 shrink min-w-0 flex-nowrap justify-end">
         {/* Dynamic Backend Connection Node Pill */}
         <motion.button
           whileHover={{ scale: 1.03 }}
           whileTap={{ scale: 0.97 }}
           onClick={() => setIsBackendModalOpen(true)}
-          className={`flex items-center gap-2 px-3 py-1.5 rounded-2xl border text-xs font-semibold shadow-sm transition-all cursor-pointer shrink-0 ${
+          className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-xl border text-[11px] font-semibold shadow-xs transition-all cursor-pointer shrink-0 ${
             isColabNode
               ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-200 border-amber-500/30'
               : 'bg-blue-500/10 hover:bg-blue-500/20 text-blue-800 dark:text-blue-200 border-blue-500/30'
@@ -260,22 +258,18 @@ export const HeaderBar: React.FC<HeaderBarProps> = React.memo(({
             }`}></span>
           </span>
           {isColabNode ? <Cloud className="w-3.5 h-3.5 text-amber-500" /> : <Server className="w-3.5 h-3.5 text-clinical-blue" />}
-          <span className="font-extrabold text-[11px]">{isColabNode ? 'Colab GPU' : 'Local Node'}</span>
-          <span className="hidden xl:inline text-[10px] font-mono text-slate-500 dark:text-slate-400 font-bold bg-white/80 dark:bg-slate-800 px-1.5 py-0.2 rounded border border-slate-200/60 dark:border-slate-700 max-w-[120px] truncate">
-            {isColabNode ? backendUrl.replace('https://', '').split('.')[0] : ':8000'}
-          </span>
+          <span className="font-extrabold text-[10px] sm:text-[11px] whitespace-nowrap">{isColabNode ? 'Colab GPU' : 'Local Node'}</span>
         </motion.button>
 
         {/* Quick Search Cmd+K Button */}
         {onOpenCommandPalette && (
           <button
             onClick={onOpenCommandPalette}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-2xl bg-slate-100/90 dark:bg-slate-800/90 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200/80 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-semibold shadow-sm transition-all shrink-0"
+            className="flex items-center gap-1 px-1.5 sm:px-2 py-1.5 rounded-xl bg-slate-100/90 dark:bg-slate-800/90 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200/80 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-semibold shadow-xs transition-all shrink-0 cursor-pointer"
             title="Open Quick Search & Jump Palette (Cmd+K)"
           >
             <Search className="w-3.5 h-3.5 text-slate-400" />
-            <span className="hidden lg:inline text-[11px]">Jump</span>
-            <kbd className="text-[10px] font-mono bg-white dark:bg-slate-900 px-1 py-0.5 rounded border border-slate-200 dark:border-slate-700 text-slate-400">
+            <kbd className="hidden sm:inline text-[10px] font-mono bg-white dark:bg-slate-900 px-1 py-0.5 rounded border border-slate-200 dark:border-slate-700 text-slate-400 font-semibold">
               ⌘K
             </kbd>
           </button>
@@ -285,7 +279,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = React.memo(({
         {onExportNote && (
           <button
             onClick={onExportNote}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-2xl bg-slate-100/90 dark:bg-slate-800/90 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200/80 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-semibold shadow-sm transition-all shrink-0"
+            className="flex items-center gap-1 px-1.5 sm:px-2 py-1.5 rounded-xl bg-slate-100/90 dark:bg-slate-800/90 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200/80 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-semibold shadow-xs transition-all shrink-0 cursor-pointer"
             title="Export Current Clinical Note & FHIR Bundle"
           >
             <Download className="w-3.5 h-3.5 text-slate-500" />
@@ -298,10 +292,11 @@ export const HeaderBar: React.FC<HeaderBarProps> = React.memo(({
           whileHover={{ scale: 1.03 }}
           whileTap={{ scale: 0.97 }}
           onClick={onOpenSafetyModal}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-500/25 transition-all text-xs font-bold group cursor-pointer shadow-sm shrink-0"
+          className="flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-500/25 transition-all text-xs font-bold group cursor-pointer shadow-xs shrink-0"
+          title="Air-Gapped Sovereign Execution"
         >
           <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-          <span className="text-[11px]">Air-Gapped</span>
+          <span className="hidden lg:inline text-[11px] whitespace-nowrap">Air-Gapped</span>
         </motion.button>
 
         {/* Dynamic Hardware Auto-Detection Button -> Opens Model Manager */}
@@ -309,13 +304,13 @@ export const HeaderBar: React.FC<HeaderBarProps> = React.memo(({
           whileHover={{ scale: 1.03 }}
           whileTap={{ scale: 0.97 }}
           onClick={onOpenModelManager}
-          className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-indigo-50/90 dark:bg-indigo-950/60 hover:bg-indigo-100/90 dark:hover:bg-indigo-900/60 border border-indigo-200/80 dark:border-indigo-800 text-indigo-900 dark:text-indigo-200 text-xs font-semibold shadow-sm transition-all cursor-pointer shrink-0"
+          className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-xl bg-indigo-50/90 dark:bg-indigo-950/60 hover:bg-indigo-100/90 dark:hover:bg-indigo-900/60 border border-indigo-200/80 dark:border-indigo-800 text-indigo-900 dark:text-indigo-200 text-xs font-semibold shadow-xs transition-all cursor-pointer shrink-0"
           title="Click to Open Model Manager & Unified Memory Dashboard"
         >
           <Cpu className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-          <span className="font-extrabold text-[11px]">{hardware?.gpu_name || hardware?.chip || 'Compute Node'}</span>
-          <span className="text-[10px] font-mono text-indigo-700 dark:text-indigo-300 bg-white/90 dark:bg-slate-900 px-1 py-0.5 rounded border border-indigo-200 dark:border-indigo-800 font-bold">
-            {hardware ? (hardware.is_apple_silicon ? `${hardware.total_memory_gb}GB Unified` : `${hardware.total_memory_gb}GB RAM/VRAM`) : 'Awaiting Link'}
+          <span className="hidden md:inline font-extrabold text-[11px] max-w-[80px] xl:max-w-[120px] truncate">{hardware?.gpu_name || hardware?.chip || 'Compute'}</span>
+          <span className="text-[10px] font-mono text-indigo-700 dark:text-indigo-300 bg-white/90 dark:bg-slate-900 px-1 py-0.5 rounded border border-indigo-200 dark:border-indigo-800 font-bold whitespace-nowrap">
+            {hardware ? `${hardware.total_memory_gb}GB` : 'Ready'}
           </span>
         </motion.button>
 
@@ -323,11 +318,11 @@ export const HeaderBar: React.FC<HeaderBarProps> = React.memo(({
         {onOpenModelManager && (
           <button
             onClick={onOpenModelManager}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-2xl bg-slate-100/90 dark:bg-slate-800/90 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200/80 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold shadow-sm transition-all cursor-pointer shrink-0"
+            className="flex items-center gap-1 px-1.5 sm:px-2 py-1.5 rounded-xl bg-slate-100/90 dark:bg-slate-800/90 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200/80 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold shadow-xs transition-all cursor-pointer shrink-0"
             title="Manage Pretrained Medical Models & Ollama Hub"
           >
             <Layers className="w-3.5 h-3.5 text-clinical-blue" />
-            <span className="hidden 2xl:inline text-[11px]">Models</span>
+            <span className="hidden xl:inline text-[11px]">Models</span>
           </button>
         )}
 
@@ -335,7 +330,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = React.memo(({
         {onToggleTheme && (
           <button
             onClick={onToggleTheme}
-            className="p-1.5 rounded-2xl bg-white/80 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:text-clinical-blue transition-colors shadow-sm shrink-0"
+            className="p-1.5 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:text-clinical-blue transition-colors shadow-xs shrink-0 cursor-pointer"
             title={isDarkMode ? "Switch to Clinical Light Theme" : "Switch to Obsidian Dark Theme"}
           >
             {isDarkMode ? <Sun className="w-3.5 h-3.5 text-amber-400" /> : <Moon className="w-3.5 h-3.5 text-indigo-500" />}
@@ -346,7 +341,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = React.memo(({
         {onOpenSettings && (
           <button
             onClick={onOpenSettings}
-            className="p-1.5 rounded-2xl bg-white/80 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:text-clinical-blue transition-colors shadow-sm shrink-0"
+            className="p-1.5 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:text-clinical-blue transition-colors shadow-xs shrink-0 cursor-pointer"
             title="Appliance Settings, Font Size & Audio Calibration"
           >
             <Settings className="w-3.5 h-3.5" />

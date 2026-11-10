@@ -248,7 +248,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
     return () => {
       isCurrent = false;
     };
-  }, [soapData.subjective, soapData.objective, soapData.assessment, soapData.plan, soapData.is_insufficient, selectedEncounter]);
+  }, [soapData.subjective, soapData.objective, soapData.assessment, soapData.plan, soapData.is_insufficient, selectedEncounter?.id]);
 
   const handleApplyAlternative = (alt: string) => {
     setSoapData((prev) => ({
@@ -270,19 +270,21 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
     const fetchTelemetry = async () => {
       try {
         const specs = await clinixApi.getHardwareSpecs();
-        if (isMounted) {
-          setHardwareSpecs(specs);
-          setLiveLatencyMs((prev) => {
-            const jitter = (Math.random() - 0.5) * 1.4;
-            return Number(Math.max(12.4, Math.min(24.5, prev + jitter)).toFixed(1));
+        if (isMounted && specs) {
+          setHardwareSpecs((prev) => {
+            if (prev && prev.chip === specs.chip && prev.gpu_name === specs.gpu_name && prev.total_memory_gb === specs.total_memory_gb) {
+              return prev;
+            }
+            setLiveLatencyMs(18.2);
+            return specs;
           });
         }
       } catch {
-        // offline fallback
+        // silent offline fallback
       }
     };
     void fetchTelemetry();
-    const interval = setInterval(fetchTelemetry, 3000);
+    const interval = setInterval(fetchTelemetry, 8000);
     const handleBackendChange = () => {
       void fetchTelemetry();
     };
@@ -338,7 +340,15 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
         });
 
         const activeList = mapped.filter((m) => !completedIds.includes(m.id));
-        setEncounters(activeList);
+        setEncounters((prev) => {
+          if (
+            prev.length === activeList.length &&
+            prev.every((p, idx) => p.id === activeList[idx].id && p.status === activeList[idx].status && p.patientName === activeList[idx].patientName)
+          ) {
+            return prev;
+          }
+          return activeList;
+        });
         setSelectedEncounter((curr) => {
           if (curr && activeList.some((m) => m.id === curr.id)) return curr;
           return activeList[0] || null;
@@ -354,7 +364,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
 
   useEffect(() => {
     void loadDynamicRoster();
-    const interval = setInterval(loadDynamicRoster, 4500);
+    const interval = setInterval(loadDynamicRoster, 8000);
     return () => clearInterval(interval);
   }, [loadDynamicRoster]);
 
@@ -613,10 +623,7 @@ HIPAA Security Rule §164.312 Integrity Mechanism Certified
   return (
     <div className="space-y-10 max-w-7xl mx-auto pb-20">
       {/* 1. Hero / Executive Clinician Hub */}
-      <motion.section 
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35 }}
+      <section 
         className="glass-card p-9 border border-white/90 shadow-diffuse relative overflow-hidden"
       >
         <div className="absolute top-0 right-0 w-96 h-2 hatch-badge-blue rounded-bl-xl" />
@@ -645,7 +652,7 @@ HIPAA Security Rule §164.312 Integrity Mechanism Certified
               Executive & Clinician Hub
             </h1>
             <p className="text-slate-600 dark:text-slate-300 text-sm mt-2.5 max-w-2xl leading-relaxed">
-              {currentUser.name}’s clinical session status with 100% on-premises data residency indicators, real-time GPU/inference metrics, and live dual-speaker ambient diarization.
+              Unified clinical operations cockpit, real-time patient encounter telemetry, and ambient documentation workflow.
             </p>
           </div>
 
@@ -699,13 +706,10 @@ HIPAA Security Rule §164.312 Integrity Mechanism Certified
             </motion.div>
           </div>
         </div>
-      </motion.section>
+      </section>
 
       {/* 2. Interactive Encounter Selector Carousel */}
-      <motion.section 
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, delay: 0.05 }}
+      <section 
         className="glass-card p-7 border border-white/90 shadow-diffuse"
       >
         <div className="flex items-center justify-between mb-5">
@@ -907,14 +911,10 @@ HIPAA Security Rule §164.312 Integrity Mechanism Certified
             </AnimatePresence>
           </div>
         )}
-      </motion.section>
+      </section>
 
       {/* 3. Real-Time Audio Waveform Visualizer */}
-      <motion.div
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, delay: 0.1 }}
-      >
+      <div>
         <AudioWaveform
           isStreaming={isStreamingAudio}
           onToggleStreaming={() => setIsStreamingAudio(!isStreamingAudio)}
@@ -924,15 +924,12 @@ HIPAA Security Rule §164.312 Integrity Mechanism Certified
           patientId={selectedEncounter?.id}
           onNewTurn={handleAudioNewTurn}
         />
-      </motion.div>
+      </div>
 
       {/* 4. Two-Column Workspace: Live Diarization Stream (Left) & Tabbed SOAP Synthesizer (Right) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Left Column (5 Cols): Live Transcript Stream with Speaker Tags */}
-        <motion.div 
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35, delay: 0.15 }}
+        <div 
           className="lg:col-span-5 glass-card p-7 border border-white/90 dark:border-slate-800 shadow-diffuse flex flex-col min-h-[640px] transition-all h-auto"
         >
           <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800 mb-5">
@@ -967,15 +964,15 @@ HIPAA Security Rule §164.312 Integrity Mechanism Certified
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                 <Users className="w-3.5 h-3.5 text-clinical-blue" />
-                <span>Auto-Diarization Engine:</span>
+                <span>Ambient Diarization Engine</span>
               </span>
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span>Autonomous Context & Clustering</span>
+                <span>Active Turn Attribution</span>
               </span>
             </div>
             <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-normal">
-              Continuous single-stream speech is automatically segmented and clustered into Clinician vs Patient roles through conversational syntax analysis, clinical interrogative cues, and neural acoustic clustering.
+              Multi-party speech attribution and role segmentation between attending clinician and patient.
             </p>
             <div className="flex items-center gap-2 pt-0.5">
               <div className="flex-1 px-2.5 py-1.5 rounded-lg bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200/60 dark:border-blue-900/40 flex items-center gap-2">
@@ -1085,13 +1082,10 @@ HIPAA Security Rule §164.312 Integrity Mechanism Certified
               Verify Provenance <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
-        </motion.div>
+        </div>
 
         {/* Right Column (7 Cols): Tabbed SOAP Note Synthesizer */}
-        <motion.div 
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35, delay: 0.2 }}
+        <div 
           className="lg:col-span-7 glass-card p-7 border border-white/90 dark:border-slate-800 shadow-diffuse flex flex-col min-h-[640px]"
         >
           {/* Header & Tabs */}
@@ -1226,7 +1220,7 @@ HIPAA Security Rule §164.312 Integrity Mechanism Certified
                   report={patientReport}
                   patientName={selectedEncounter ? `${selectedEncounter.patientName} (${selectedEncounter.dob})` : 'Active Patient'}
                   studyTitle={selectedEncounter ? `${selectedEncounter.chiefComplaint} Consultation` : 'Clinical Visit & Orders'}
-                  doctorName={`${currentUser.name} (CMIO)`}
+                  doctorName={`${currentUser.name} (${currentUser.role || 'MD'})`}
                   dateStr={selectedEncounter?.timestamp || 'Today'}
                   isGenerating={isSynthesizing}
                   onRefresh={handleSynthesizeFresh}
@@ -1697,7 +1691,7 @@ HIPAA Security Rule §164.312 Integrity Mechanism Certified
               <ChevronRight className="w-4 h-4" />
             </motion.button>
           </div>
-        </motion.div>
+        </div>
       </div>
 
       {/* Patient Registration Modal */}

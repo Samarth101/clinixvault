@@ -28,14 +28,19 @@ export function getApiBaseUrl(): string {
   if (typeof window !== 'undefined') {
     const saved = localStorage.getItem('clinixvault_api_url');
     if (saved && saved.trim()) {
-      return saved.trim().replace(/\/+$/, '');
+      const clean = saved.trim().replace(/\/+$/, '');
+      // Purge obsolete/expired tunnel URLs
+      if (!clean.includes('consistent-testimonials')) {
+        return clean;
+      }
+      localStorage.removeItem('clinixvault_api_url');
     }
   }
   const envUrl = import.meta.env.VITE_API_URL;
   if (envUrl !== undefined && envUrl !== '') {
     return envUrl.trim().replace(/\/+$/, '');
   }
-  return import.meta.env.DEV ? 'http://127.0.0.1:8000' : '';
+  return 'https://barry-cake-sugar-elizabeth.trycloudflare.com';
 }
 
 export function setApiBaseUrl(url: string): void {
@@ -1336,6 +1341,109 @@ export const clinixApi = {
       return false;
     }
   },
+
+  /**
+   * Fetch all registered clinicians from database
+   */
+  async getClinicians(): Promise<any[]> {
+    try {
+      const resp = await fetch(`${getApiBaseUrl()}/api/v1/clinicians`, {
+        headers: {
+          Accept: 'application/json',
+          Authorization: 'Bearer vault-local-admin-token',
+        },
+      });
+      if (resp.ok) {
+        return await resp.json();
+      }
+    } catch {
+      // offline fallback
+    }
+    return [];
+  },
+
+  /**
+   * Register a new clinician in the database
+   */
+  async createClinician(data: any): Promise<any | null> {
+    try {
+      const resp = await fetch(`${getApiBaseUrl()}/api/v1/clinicians`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          Authorization: 'Bearer vault-local-admin-token',
+        },
+        body: JSON.stringify(data),
+      });
+      if (resp.ok) {
+        return await resp.json();
+      }
+    } catch {
+      // offline fallback
+    }
+    return null;
+  },
+
+  /**
+   * Set active authenticated clinician in database
+   */
+  async activateClinician(clinicianId: string): Promise<any | null> {
+    try {
+      const resp = await fetch(`${getApiBaseUrl()}/api/v1/clinicians/${clinicianId}/activate`, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          Authorization: 'Bearer vault-local-admin-token',
+        },
+      });
+      if (resp.ok) {
+        return await resp.json();
+      }
+    } catch {
+      // offline fallback
+    }
+    return null;
+  },
+
+  /**
+   * Get currently active clinician from database
+   */
+  async getActiveClinician(): Promise<any | null> {
+    try {
+      const resp = await fetch(`${getApiBaseUrl()}/api/v1/clinicians/active`, {
+        headers: {
+          Accept: 'application/json',
+          Authorization: 'Bearer vault-local-admin-token',
+        },
+      });
+      if (resp.ok) {
+        return await resp.json();
+      }
+    } catch {
+      // offline fallback
+    }
+    return null;
+  },
+
+  /**
+   * Delete clinician from database
+   */
+  async deleteClinician(clinicianId: string): Promise<boolean> {
+    try {
+      const resp = await fetch(`${getApiBaseUrl()}/api/v1/clinicians/${clinicianId}`, {
+        method: 'DELETE',
+        headers: {
+          Accept: 'application/json',
+          Authorization: 'Bearer vault-local-admin-token',
+        },
+      });
+      return resp.ok;
+    } catch {
+      return false;
+    }
+  },
+
 
   /**
    * Fetch complete patient detail with encounters and signed reports

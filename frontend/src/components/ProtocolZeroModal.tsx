@@ -158,7 +158,7 @@ export const ProtocolZeroModal: React.FC<ProtocolZeroModalProps> = ({
                   </div>
                 </div>
 
-                <div className="flex gap-3">
+                <form onSubmit={(e) => { e.preventDefault(); handleSimulateProtocolZero(); }} className="flex gap-3">
                   <div className="relative flex-1">
                     <Key className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
@@ -171,10 +171,10 @@ export const ProtocolZeroModal: React.FC<ProtocolZeroModalProps> = ({
                   </div>
 
                   <motion.button
+                    type="submit"
                     whileHover={{ scale: 1.04 }}
                     whileTap={{ scale: 0.96 }}
                     disabled={wipeStatus === 'executing'}
-                    onClick={handleSimulateProtocolZero}
                     className="px-4.5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-xs shadow-md shadow-rose-600/30 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                   >
                     {wipeStatus === 'executing' ? (
@@ -189,7 +189,7 @@ export const ProtocolZeroModal: React.FC<ProtocolZeroModalProps> = ({
                       </>
                     )}
                   </motion.button>
-                </div>
+                </form>
 
                 {wipeStatus === 'success' && (
                   <motion.div 

@@ -151,7 +151,7 @@ export const ProvenanceFHIRPage: React.FC<ProvenanceFHIRPageProps> = ({ onNaviga
         // Build live audit ledger blocks from report's cryptographic provenance
         const prov = rep?.provenance;
         const provHash = rep?.provenance_hash || prov?.content_sha256 || 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
-        const signer = prov?.signer_identity || 'Dr. Amanda Chen (Practitioner/DR-AMANDA-CHEN)';
+        const signer = prov?.signer_identity || `${currentUser.name} (Practitioner/${currentUser.npi || currentUser.id})`;
         const dateStr = rep?.created_at ? new Date(rep.created_at).toISOString().replace('T', ' ').slice(0, 19) : new Date().toISOString().replace('T', ' ').slice(0, 19);
 
         const liveBlocks = [

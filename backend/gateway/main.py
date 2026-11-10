@@ -28,6 +28,7 @@ from backend.gateway.routes import (
     models,
     graph,
     patients,
+    clinicians,
     clinical_utilities,
     telemetry,
 )
@@ -104,6 +105,7 @@ app.include_router(system.router)
 app.include_router(models.router)
 app.include_router(graph.router)
 app.include_router(patients.router)
+app.include_router(clinicians.router)
 app.include_router(clinical_utilities.router)
 app.include_router(telemetry.router)
 

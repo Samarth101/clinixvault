@@ -1344,11 +1344,11 @@ export const ClinicalKnowledgeGraph3D: React.FC<ClinicalKnowledgeGraph3DProps> =
 
     // 7. Render Loop with Rotating Golden Spiked HUD Rings
     let animId: number;
-    const clock = new THREE.Clock();
+    const animStartTime = performance.now();
 
     const animate = () => {
       animId = requestAnimationFrame(animate);
-      const t = clock.getElapsedTime();
+      const t = (performance.now() - animStartTime) * 0.001;
       const camPos = camera.position;
 
       nodesList.forEach((node) => {

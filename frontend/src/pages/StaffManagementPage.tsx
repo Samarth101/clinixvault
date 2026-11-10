@@ -20,8 +20,11 @@ import {
 } from 'lucide-react';
 import { StaffMember } from '../types';
 import { authService } from '../services/authService';
+import { clinixApi } from '../services/api';
+import { useAuth } from '../context/useAuth';
 
 export const StaffManagementPage: React.FC = () => {
+  const { currentUser, switchUser } = useAuth();
   const [staffList, setStaffList] = useState<StaffMember[]>(() => {
     try {
       const stored = localStorage.getItem('clinixvault_staff_members');
@@ -39,6 +42,36 @@ export const StaffManagementPage: React.FC = () => {
   const [selectedStatus, setSelectedStatus] = useState<string>('All');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
+
+  // Sync with backend database on mount
+  useEffect(() => {
+    const syncWithDb = async () => {
+      try {
+        const dbClinicians = await clinixApi.getClinicians();
+        if (Array.isArray(dbClinicians) && dbClinicians.length > 0) {
+          const mapped: StaffMember[] = dbClinicians.map((c: any) => ({
+            id: c.id,
+            name: c.name,
+            role: c.role || 'Attending Physician',
+            department: c.department || 'Internal Medicine',
+            specialty: c.specialty || 'Clinical Medicine',
+            npi: c.npi || `NPI-1000000000`,
+            email: c.email || `${c.name.toLowerCase().replace(/[^a-z]/g, '.')}@memorial.clinixvault.internal`,
+            accessTier: (c.access_tier as StaffMember['accessTier']) || 'Tier 1 — Executive/Attending',
+            breakGlassPrivilege: Boolean(c.break_glass_authorized),
+            ssoStatus: (c.sso_status as StaffMember['ssoStatus']) || 'Active Directory Synced',
+            status: (c.status as StaffMember['status']) || 'Active',
+            assignedNode: c.assigned_node || 'CV-NODE-01 (Exam 1-4)',
+            lastActive: 'Active in Database',
+          }));
+          setStaffList(mapped);
+        }
+      } catch {
+        // ignore
+      }
+    };
+    void syncWithDb();
+  }, []);
 
   // Sync changes to localStorage
   useEffect(() => {
@@ -71,7 +104,7 @@ export const StaffManagementPage: React.FC = () => {
 
   // Switch active session to this staff member
   const handleSwitchSession = (staff: StaffMember) => {
-    authService.loginWithSSO(staff.id);
+    switchUser(staff.id);
     showNotification(`Active clinical session authenticated as ${staff.name}`);
   };
 
@@ -543,14 +576,21 @@ export const StaffManagementPage: React.FC = () => {
                         {/* Actions */}
                         <td className="py-4 px-6 text-right">
                           <div className="flex items-center justify-end gap-1.5">
-                            <button
-                              onClick={() => handleSwitchSession(staff)}
-                              title={`Sign in session as ${staff.name}`}
-                              className="px-2.5 py-1.5 text-xs font-bold text-clinical-blue hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-xl transition-colors cursor-pointer inline-flex items-center gap-1"
-                            >
-                              <LogIn className="w-3.5 h-3.5" />
-                              <span className="hidden xl:inline">Sign In</span>
-                            </button>
+                            {currentUser.id === staff.id || currentUser.name === staff.name ? (
+                              <span className="px-2.5 py-1 text-xs font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl inline-flex items-center gap-1 border border-emerald-200 dark:border-emerald-800">
+                                <BadgeCheck className="w-3.5 h-3.5" />
+                                <span>Active</span>
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => handleSwitchSession(staff)}
+                                title={`Sign in session as ${staff.name}`}
+                                className="px-2.5 py-1.5 text-xs font-bold text-clinical-blue hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-xl transition-colors cursor-pointer inline-flex items-center gap-1"
+                              >
+                                <LogIn className="w-3.5 h-3.5" />
+                                <span className="hidden xl:inline">Sign In</span>
+                              </button>
+                            )}
 
                             <button
                               onClick={() => handleRemoveStaff(staff.id, staff.name)}
@@ -622,7 +662,7 @@ export const StaffManagementPage: React.FC = () => {
                     <input
                       type="text"
                       required
-                      placeholder="e.g. Dr. Amanda Chen, MD"
+                      placeholder="e.g. Dr. Marcus Vance, MD"
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       className="w-full px-3.5 py-2 text-xs bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-clinical-blue"

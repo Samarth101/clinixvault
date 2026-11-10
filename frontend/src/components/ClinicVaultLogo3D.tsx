@@ -511,12 +511,12 @@ export const ClinicVaultLogo3D = forwardRef<ClinicVaultLogo3DHandle, ClinicVault
       container.addEventListener('pointerleave', handlePointerLeave);
     }
 
-    const clock = new THREE.Clock();
+    const animStartTime = performance.now();
     let animId: number;
 
     const animate = () => {
       animId = requestAnimationFrame(animate);
-      const t = clock.getElapsedTime();
+      const t = (performance.now() - animStartTime) * 0.001;
 
       // Dynamic rotation speed (accelerated during loading state)
       const airGapSpeed = isLoading ? 0.05 : 0.008;
