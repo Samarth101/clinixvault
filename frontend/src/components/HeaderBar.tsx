@@ -24,11 +24,11 @@ import { BackendNodeModal } from './BackendNodeModal';
 import { formatISTTime } from '../utils/time';
 
 const HeaderClock: React.FC = React.memo(() => {
-  const [time, setTime] = useState<string>(() => formatISTTime(new Date()));
+  const [time, setTime] = useState<string>(() => formatISTTime(new Date(), false));
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setTime(formatISTTime(new Date()));
+      setTime(formatISTTime(new Date(), false));
     }, 1000);
     return () => clearInterval(interval);
   }, []);
@@ -95,9 +95,9 @@ export const HeaderBar: React.FC<HeaderBarProps> = React.memo(({
 
   return (
     <>
-    <header className="w-full glass-card px-2.5 sm:px-4 py-2 mb-3 shrink-0 flex items-center justify-between gap-1.5 sm:gap-2.5 border border-white/90 dark:border-slate-800 shadow-diffuse z-40 backdrop-blur-3xl bg-white/85 dark:bg-slate-900/85 transition-all duration-200 overflow-x-hidden flex-nowrap">
+    <header className="w-full glass-card px-2.5 sm:px-4 py-2 mb-3 shrink-0 flex items-center justify-between gap-2 sm:gap-3 border border-white/90 dark:border-slate-800 shadow-diffuse z-40 backdrop-blur-3xl bg-white/85 dark:bg-slate-900/85 transition-all duration-200 min-w-0 overflow-hidden">
       {/* Brand & Clinician Session */}
-      <div className="flex items-center gap-2 sm:gap-3 shrink min-w-0">
+      <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0 flex-1 mr-2">
         <div 
           onClick={onNavigateLanding}
           className="flex items-center gap-2 cursor-pointer group shrink-0"
@@ -106,12 +106,12 @@ export const HeaderBar: React.FC<HeaderBarProps> = React.memo(({
           <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-blue-50/80 dark:bg-slate-800 border border-blue-100 dark:border-slate-700 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0 shadow-xs" title="ClinixVault Sovereign Monolith">
             <ClinicVaultLogoSVG size={26} />
           </div>
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-1.5">
-              <h1 className="text-sm sm:text-base xl:text-lg font-extrabold tracking-tight text-slate-900 dark:text-white font-sans whitespace-nowrap">
-                ClinixVault<span className="text-clinical-blue font-black">.Enterprise</span>
+              <h1 className="hidden md:block text-sm sm:text-base font-extrabold tracking-tight text-slate-900 dark:text-white font-sans whitespace-nowrap">
+                ClinixVault<span className="hidden xl:inline text-clinical-blue font-black">.Enterprise</span>
               </h1>
-              <span className="hidden sm:inline px-1.5 py-0.5 text-[9px] sm:text-[10px] font-bold bg-blue-50 dark:bg-blue-900/40 text-clinical-blue dark:text-blue-300 rounded-full border border-blue-200/80 dark:border-blue-800 font-mono shadow-xs whitespace-nowrap">
+              <span className="hidden 2xl:inline px-1.5 py-0.5 text-[9px] font-bold bg-blue-50 dark:bg-blue-900/40 text-clinical-blue dark:text-blue-300 rounded-full border border-blue-200/80 dark:border-blue-800 font-mono shadow-xs whitespace-nowrap">
                 {currentUser.firmware}
               </span>
             </div>
@@ -121,25 +121,25 @@ export const HeaderBar: React.FC<HeaderBarProps> = React.memo(({
           </div>
         </div>
 
-        <div className="hidden lg:block h-6 w-[1px] bg-slate-200/80 dark:bg-slate-700/80 shrink-0" />
+        <div className="hidden xl:block h-5 w-[1px] bg-slate-200/80 dark:bg-slate-700/80 shrink-0" />
 
         {/* Doctor Persona Card with Interactive Dropdown */}
-        <div className="relative shrink-0">
+        <div className="relative min-w-0 shrink">
           <button 
             onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-            className="flex items-center gap-1.5 sm:gap-2 bg-slate-50/90 dark:bg-slate-800/80 hover:bg-slate-100/90 dark:hover:bg-slate-700/80 px-2 sm:px-2.5 py-1.5 rounded-xl border border-slate-200/70 dark:border-slate-700/70 shadow-xs transition-all cursor-pointer text-left"
+            className="flex items-center gap-1.5 sm:gap-2 bg-slate-50/90 dark:bg-slate-800/80 hover:bg-slate-100/90 dark:hover:bg-slate-700/80 px-2 sm:px-2.5 py-1.5 rounded-xl border border-slate-200/70 dark:border-slate-700/70 shadow-xs transition-all cursor-pointer text-left min-w-0 max-w-full"
             title="Clinician Account & Profile"
           >
             <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-clinical-blue text-white flex items-center justify-center font-bold text-[11px] sm:text-xs shadow-xs shrink-0">
               {currentUser.avatarInitials || 'MD'}
             </div>
-            <div className="max-w-[85px] sm:max-w-[130px] xl:max-w-[160px] truncate">
-              <div className="flex items-center gap-1">
+            <div className="hidden md:block min-w-0 max-w-[100px] xl:max-w-[140px] 2xl:max-w-[180px] truncate">
+              <div className="flex items-center gap-1 min-w-0">
                 <span className="text-xs font-bold text-slate-900 dark:text-white truncate">{currentUser.name}</span>
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
                 <ChevronDown className="w-3 h-3 text-slate-400 shrink-0 ml-0.5" />
               </div>
-              <div className="flex items-center gap-1 text-[10px] text-slate-500 dark:text-slate-400 font-medium truncate">
+              <div className="hidden 2xl:flex items-center gap-1 text-[10px] text-slate-500 dark:text-slate-400 font-medium truncate">
                 <span className="text-clinical-blue dark:text-blue-400 font-semibold truncate">{currentUser.role}</span>
               </div>
             </div>
@@ -236,7 +236,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = React.memo(({
       </div>
 
       {/* Edge Metrics, Utility Controls & Air-Gap Telemetry */}
-      <div className="flex items-center gap-1 sm:gap-1.5 shrink min-w-0 flex-nowrap justify-end">
+      <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 flex-nowrap justify-end">
         {/* Dynamic Backend Connection Node Pill */}
         <motion.button
           whileHover={{ scale: 1.03 }}
@@ -249,7 +249,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = React.memo(({
           }`}
           title={`Active Backend: ${backendUrl}\nClick to switch or paste new Colab Cloudflare URL`}
         >
-          <span className="relative flex h-2 w-2">
+          <span className="relative flex h-2 w-2 shrink-0">
             <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
               isBackendOnline ? (isColabNode ? 'bg-amber-400' : 'bg-emerald-400') : 'bg-rose-400'
             }`}></span>
@@ -257,7 +257,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = React.memo(({
               isBackendOnline ? (isColabNode ? 'bg-amber-500' : 'bg-emerald-500') : 'bg-rose-500'
             }`}></span>
           </span>
-          {isColabNode ? <Cloud className="w-3.5 h-3.5 text-amber-500" /> : <Server className="w-3.5 h-3.5 text-clinical-blue" />}
+          {isColabNode ? <Cloud className="w-3.5 h-3.5 text-amber-500 shrink-0" /> : <Server className="w-3.5 h-3.5 text-clinical-blue shrink-0" />}
           <span className="font-extrabold text-[10px] sm:text-[11px] whitespace-nowrap">{isColabNode ? 'Colab GPU' : 'Local Node'}</span>
         </motion.button>
 
@@ -265,11 +265,11 @@ export const HeaderBar: React.FC<HeaderBarProps> = React.memo(({
         {onOpenCommandPalette && (
           <button
             onClick={onOpenCommandPalette}
-            className="flex items-center gap-1 px-1.5 sm:px-2 py-1.5 rounded-xl bg-slate-100/90 dark:bg-slate-800/90 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200/80 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-semibold shadow-xs transition-all shrink-0 cursor-pointer"
+            className="hidden md:flex items-center gap-1 px-1.5 sm:px-2 py-1.5 rounded-xl bg-slate-100/90 dark:bg-slate-800/90 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200/80 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-semibold shadow-xs transition-all shrink-0 cursor-pointer"
             title="Open Quick Search & Jump Palette (Cmd+K)"
           >
             <Search className="w-3.5 h-3.5 text-slate-400" />
-            <kbd className="hidden sm:inline text-[10px] font-mono bg-white dark:bg-slate-900 px-1 py-0.5 rounded border border-slate-200 dark:border-slate-700 text-slate-400 font-semibold">
+            <kbd className="hidden xl:inline text-[10px] font-mono bg-white dark:bg-slate-900 px-1 py-0.5 rounded border border-slate-200 dark:border-slate-700 text-slate-400 font-semibold">
               ⌘K
             </kbd>
           </button>
@@ -279,11 +279,11 @@ export const HeaderBar: React.FC<HeaderBarProps> = React.memo(({
         {onExportNote && (
           <button
             onClick={onExportNote}
-            className="flex items-center gap-1 px-1.5 sm:px-2 py-1.5 rounded-xl bg-slate-100/90 dark:bg-slate-800/90 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200/80 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-semibold shadow-xs transition-all shrink-0 cursor-pointer"
+            className="hidden lg:flex items-center gap-1 px-1.5 sm:px-2 py-1.5 rounded-xl bg-slate-100/90 dark:bg-slate-800/90 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200/80 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-semibold shadow-xs transition-all shrink-0 cursor-pointer"
             title="Export Current Clinical Note & FHIR Bundle"
           >
             <Download className="w-3.5 h-3.5 text-slate-500" />
-            <span className="hidden xl:inline text-[11px]">FHIR</span>
+            <span className="hidden 2xl:inline text-[11px]">FHIR</span>
           </button>
         )}
 
@@ -292,11 +292,11 @@ export const HeaderBar: React.FC<HeaderBarProps> = React.memo(({
           whileHover={{ scale: 1.03 }}
           whileTap={{ scale: 0.97 }}
           onClick={onOpenSafetyModal}
-          className="flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-500/25 transition-all text-xs font-bold group cursor-pointer shadow-xs shrink-0"
+          className="hidden lg:flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-500/25 transition-all text-xs font-bold group cursor-pointer shadow-xs shrink-0"
           title="Air-Gapped Sovereign Execution"
         >
           <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-          <span className="hidden lg:inline text-[11px] whitespace-nowrap">Air-Gapped</span>
+          <span className="hidden 2xl:inline text-[11px] whitespace-nowrap">Air-Gapped</span>
         </motion.button>
 
         {/* Dynamic Hardware Auto-Detection Button -> Opens Model Manager */}
@@ -307,8 +307,8 @@ export const HeaderBar: React.FC<HeaderBarProps> = React.memo(({
           className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-xl bg-indigo-50/90 dark:bg-indigo-950/60 hover:bg-indigo-100/90 dark:hover:bg-indigo-900/60 border border-indigo-200/80 dark:border-indigo-800 text-indigo-900 dark:text-indigo-200 text-xs font-semibold shadow-xs transition-all cursor-pointer shrink-0"
           title="Click to Open Model Manager & Unified Memory Dashboard"
         >
-          <Cpu className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-          <span className="hidden md:inline font-extrabold text-[11px] max-w-[80px] xl:max-w-[120px] truncate">{hardware?.gpu_name || hardware?.chip || 'Compute'}</span>
+          <Cpu className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+          <span className="hidden 2xl:inline font-extrabold text-[11px] max-w-[120px] truncate">{hardware?.gpu_name || hardware?.chip || 'Compute'}</span>
           <span className="text-[10px] font-mono text-indigo-700 dark:text-indigo-300 bg-white/90 dark:bg-slate-900 px-1 py-0.5 rounded border border-indigo-200 dark:border-indigo-800 font-bold whitespace-nowrap">
             {hardware ? `${hardware.total_memory_gb}GB` : 'Ready'}
           </span>
@@ -318,11 +318,11 @@ export const HeaderBar: React.FC<HeaderBarProps> = React.memo(({
         {onOpenModelManager && (
           <button
             onClick={onOpenModelManager}
-            className="flex items-center gap-1 px-1.5 sm:px-2 py-1.5 rounded-xl bg-slate-100/90 dark:bg-slate-800/90 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200/80 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold shadow-xs transition-all cursor-pointer shrink-0"
+            className="hidden 2xl:flex items-center gap-1 px-1.5 sm:px-2 py-1.5 rounded-xl bg-slate-100/90 dark:bg-slate-800/90 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200/80 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold shadow-xs transition-all cursor-pointer shrink-0"
             title="Manage Pretrained Medical Models & Ollama Hub"
           >
             <Layers className="w-3.5 h-3.5 text-clinical-blue" />
-            <span className="hidden xl:inline text-[11px]">Models</span>
+            <span className="text-[11px]">Models</span>
           </button>
         )}
 
@@ -349,7 +349,9 @@ export const HeaderBar: React.FC<HeaderBarProps> = React.memo(({
         )}
 
         {/* Isolated System Clock (IST) */}
-        <HeaderClock />
+        <div className="hidden xl:block shrink-0">
+          <HeaderClock />
+        </div>
       </div>
     </header>
 

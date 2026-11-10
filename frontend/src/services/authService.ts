@@ -23,20 +23,20 @@ export interface ClinicianProfile {
 }
 
 export const DEFAULT_GUEST_CLINICIAN: ClinicianProfile = {
-  id: 'clinician-unassigned',
-  name: 'Unassigned Clinician',
-  role: 'Clinical Provider',
-  title: 'Licensed Clinician',
-  department: 'General Medicine',
-  npi: 'Pending NPI',
-  badgeId: 'STAFF-PENDING',
+  id: 'clinician-marcus-vance',
+  name: 'Dr. Marcus Vance',
+  role: 'Attending Radiologist',
+  title: 'Lead Radiologist',
+  department: 'Diagnostic Radiology',
+  npi: 'NPI-1942084920',
+  badgeId: 'STAFF-MV-01',
   nodeId: 'CV-APPLIANCE-LOCAL',
-  clinic: 'Clinical Suite',
+  clinic: 'Radiology Suite 4',
   location: 'On-Premises Vault',
   firmware: 'v2.5.0-airgapped',
   authMethod: 'Keycloak Active Directory SSO',
-  avatarInitials: 'MD',
-  breakGlassAuthorized: false,
+  avatarInitials: 'MV',
+  breakGlassAuthorized: true,
 };
 
 const CLINICIANS_STORAGE_KEY = 'clinixvault_registered_clinicians';
