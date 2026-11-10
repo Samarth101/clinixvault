@@ -133,13 +133,25 @@ class Neo4jGraphManager:
     def _init_connection(self) -> None:
         """Attempts Bolt driver connection with brief timeout."""
         try:
+            import socket
+            from urllib.parse import urlparse
+            parsed = urlparse(self.uri)
+            host = parsed.hostname or "127.0.0.1"
+            port = parsed.port or 7687
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(0.05)
+            err_code = s.connect_ex((host, port))
+            s.close()
+            if err_code != 0:
+                raise ConnectionRefusedError(f"Port {port} on {host} is closed (code {err_code})")
+
             from neo4j import GraphDatabase
 
-            # Short timeout to avoid blocking startup if Neo4j is offline
+            # Short timeout to avoid blocking startup or health pulse if Neo4j is offline
             self._driver = GraphDatabase.driver(
                 self.uri,
                 auth=(self.user, self.password),
-                connection_timeout=1.0,
+                connection_timeout=0.2,
                 max_connection_lifetime=300,
             )
             self._driver.verify_connectivity()

@@ -14,14 +14,20 @@ import {
   Users,
   Layers,
   Server,
-  Cloud
+  Cloud,
+  Lock,
+  RefreshCw,
+  WifiOff
 } from 'lucide-react';
 import { useAuth } from '../context/useAuth';
-import { clinixApi, getApiBaseUrl } from '../services/api';
+import { useVaultLock } from '../context/VaultLockContext';
+import { clinixApi } from '../services/api';
 import { HardwareSpecs } from '../types';
 import { ClinicVaultLogoSVG } from './ClinicVaultLogoSVG';
 import { BackendNodeModal } from './BackendNodeModal';
 import { formatISTTime } from '../utils/time';
+import { failoverAgent, FailoverState } from '../services/nodeFailoverAgent';
+import { getCacheTelemetry, syncPendingActions, CacheTelemetry } from '../services/indexedDbCache';
 
 const HeaderClock: React.FC = React.memo(() => {
   const [time, setTime] = useState<string>(() => formatISTTime(new Date(), false));
@@ -65,33 +71,67 @@ export const HeaderBar: React.FC<HeaderBarProps> = React.memo(({
   const [hardware, setHardware] = useState<HardwareSpecs | null>(null);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isBackendModalOpen, setIsBackendModalOpen] = useState(false);
-  const [backendUrl, setBackendUrl] = useState<string>(() => getApiBaseUrl());
-  const [isBackendOnline, setIsBackendOnline] = useState<boolean>(true);
+  const [failoverState, setFailoverState] = useState<FailoverState>(() => failoverAgent.getState());
+  const [cacheTelemetry, setCacheTelemetry] = useState<CacheTelemetry>({
+    draftsCount: 0,
+    pendingCount: 0,
+    offlineEncountersCount: 0,
+    lastSyncedAt: null,
+    isSyncing: false,
+  });
+  const [isSyncingCache, setIsSyncingCache] = useState(false);
+
   const { currentUser, availableUsers, switchUser, openLoginModal, logout } = useAuth();
+  const { lockVault } = useVaultLock();
 
   const loadSpecs = useCallback(() => {
     clinixApi.getHardwareSpecs().then((specs) => {
       setHardware(specs);
-      setIsBackendOnline(true);
-    }).catch(() => {
-      setIsBackendOnline(false);
-    });
+    }).catch(() => {});
+  }, []);
+
+  const refreshCacheTelemetry = useCallback(() => {
+    getCacheTelemetry().then(setCacheTelemetry).catch(() => {});
   }, []);
 
   useEffect(() => {
     loadSpecs();
-    const handleBackendChange = () => {
-      const active = getApiBaseUrl();
-      setBackendUrl(active);
-      loadSpecs();
-    };
-    window.addEventListener('clinixvault:backend_changed', handleBackendChange);
-    return () => {
-      window.removeEventListener('clinixvault:backend_changed', handleBackendChange);
-    };
-  }, [loadSpecs]);
+    refreshCacheTelemetry();
 
-  const isColabNode = backendUrl.includes('trycloudflare.com') || backendUrl.includes('colab');
+    // Subscribe to failover agent updates (delivers within 500ms of state changes)
+    const unsubFailover = failoverAgent.subscribe((state) => {
+      setFailoverState(state);
+      loadSpecs();
+    });
+
+    const handleCacheEvent = () => refreshCacheTelemetry();
+    window.addEventListener('clinixvault:cache_synced', handleCacheEvent);
+    window.addEventListener('clinixvault:pending_queued', handleCacheEvent);
+    window.addEventListener('clinixvault:draft_saved', handleCacheEvent);
+    window.addEventListener('clinixvault:draft_deleted', handleCacheEvent);
+
+    return () => {
+      unsubFailover();
+      window.removeEventListener('clinixvault:cache_synced', handleCacheEvent);
+      window.removeEventListener('clinixvault:pending_queued', handleCacheEvent);
+      window.removeEventListener('clinixvault:draft_saved', handleCacheEvent);
+      window.removeEventListener('clinixvault:draft_deleted', handleCacheEvent);
+    };
+  }, [loadSpecs, refreshCacheTelemetry]);
+
+  const handleSyncPendingCache = async () => {
+    setIsSyncingCache(true);
+    try {
+      await syncPendingActions(clinixApi);
+      refreshCacheTelemetry();
+    } finally {
+      setIsSyncingCache(false);
+    }
+  };
+
+  const isColabActive = failoverState.activeNode === 'colab';
+  const isLocalActive = failoverState.activeNode === 'local';
+  const isOffline = failoverState.activeNode === 'offline';
 
   return (
     <>
@@ -209,6 +249,23 @@ export const HeaderBar: React.FC<HeaderBarProps> = React.memo(({
 
               <div className="h-[1px] bg-slate-200/80 dark:border-slate-800" />
 
+              {/* Lock Session Vault Action */}
+              <button
+                onClick={() => {
+                  setIsUserMenuOpen(false);
+                  lockVault('Manual Clinician Lock (§164.312)');
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors font-medium text-left cursor-pointer"
+              >
+                <Lock className="w-4 h-4 text-amber-500" />
+                <div className="flex items-center justify-between w-full">
+                  <span>Lock Session Vault</span>
+                  <kbd className="text-[9px] font-mono bg-white dark:bg-slate-800 px-1 py-0.5 rounded border text-slate-400">
+                    ⌘⌥L
+                  </kbd>
+                </div>
+              </button>
+
               <button
                 onClick={() => {
                   setIsUserMenuOpen(false);
@@ -237,28 +294,59 @@ export const HeaderBar: React.FC<HeaderBarProps> = React.memo(({
 
       {/* Edge Metrics, Utility Controls & Air-Gap Telemetry */}
       <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 flex-nowrap justify-end">
-        {/* Dynamic Backend Connection Node Pill */}
+        {/* Zero-Egress Offline Cache Sync Pill */}
+        {cacheTelemetry.pendingCount > 0 && (
+          <motion.button
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={handleSyncPendingCache}
+            disabled={isSyncingCache}
+            className="flex items-center gap-1 px-2 py-1.5 rounded-xl border bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 border-amber-500/30 text-[11px] font-bold shadow-xs cursor-pointer shrink-0"
+            title={`${cacheTelemetry.pendingCount} clinical action(s) stored in IndexedDB cache. Click to force background sync.`}
+          >
+            <RefreshCw className={`w-3 h-3 text-amber-500 ${isSyncingCache ? 'animate-spin' : ''}`} />
+            <span className="font-mono text-[10px]">{cacheTelemetry.pendingCount} Pending</span>
+          </motion.button>
+        )}
+
+        {/* Dynamic Dual-Node Failover Status Pill */}
+        {/* Acceptance criteria: amber = Colab GPU, emerald = Local Node, rose = Offline (reflects within 500ms) */}
         <motion.button
           whileHover={{ scale: 1.03 }}
           whileTap={{ scale: 0.97 }}
           onClick={() => setIsBackendModalOpen(true)}
           className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-xl border text-[11px] font-semibold shadow-xs transition-all cursor-pointer shrink-0 ${
-            isColabNode
+            isColabActive
               ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-200 border-amber-500/30'
-              : 'bg-blue-500/10 hover:bg-blue-500/20 text-blue-800 dark:text-blue-200 border-blue-500/30'
+              : isLocalActive
+              ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-800 dark:text-emerald-200 border-emerald-500/30'
+              : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-800 dark:text-rose-200 border-rose-500/30'
           }`}
-          title={`Active Backend: ${backendUrl}\nClick to switch or paste new Colab Cloudflare URL`}
+          title={`Active Gateway: ${failoverState.currentUrl}\nLatency: ${failoverState.latencyMs}ms\nAutomated Failover: ${failoverState.isAutoFailoverEnabled ? 'Enabled' : 'Disabled'}\nClick for failover controls and diagnostic telemetry`}
         >
           <span className="relative flex h-2 w-2 shrink-0">
             <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-              isBackendOnline ? (isColabNode ? 'bg-amber-400' : 'bg-emerald-400') : 'bg-rose-400'
+              isColabActive ? 'bg-amber-400' : isLocalActive ? 'bg-emerald-400' : 'bg-rose-400'
             }`}></span>
             <span className={`relative inline-flex rounded-full h-2 w-2 ${
-              isBackendOnline ? (isColabNode ? 'bg-amber-500' : 'bg-emerald-500') : 'bg-rose-500'
+              isColabActive ? 'bg-amber-500' : isLocalActive ? 'bg-emerald-500' : 'bg-rose-500'
             }`}></span>
           </span>
-          {isColabNode ? <Cloud className="w-3.5 h-3.5 text-amber-500 shrink-0" /> : <Server className="w-3.5 h-3.5 text-clinical-blue shrink-0" />}
-          <span className="font-extrabold text-[10px] sm:text-[11px] whitespace-nowrap">{isColabNode ? 'Colab GPU' : 'Local Node'}</span>
+          {isColabActive ? (
+            <Cloud className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+          ) : isLocalActive ? (
+            <Server className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+          ) : (
+            <WifiOff className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+          )}
+          <span className="font-extrabold text-[10px] sm:text-[11px] whitespace-nowrap">
+            {isColabActive ? 'Colab GPU' : isLocalActive ? 'Local Node' : 'Offline'}
+          </span>
+          {failoverState.latencyMs > 0 && !isOffline && (
+            <span className="hidden sm:inline font-mono text-[9px] opacity-80">
+              {failoverState.latencyMs}ms
+            </span>
+          )}
         </motion.button>
 
         {/* Quick Search Cmd+K Button */}
@@ -326,6 +414,15 @@ export const HeaderBar: React.FC<HeaderBarProps> = React.memo(({
           </button>
         )}
 
+        {/* Quick Lock Session Vault Button */}
+        <button
+          onClick={() => lockVault('Manual Clinician Lock')}
+          className="p-1.5 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-amber-500 dark:hover:text-amber-400 transition-colors shadow-xs shrink-0 cursor-pointer"
+          title="Lock Session Vault Immediately (Ctrl+Alt+L)"
+        >
+          <Lock className="w-3.5 h-3.5" />
+        </button>
+
         {/* Theme Mode Toggle Button */}
         {onToggleTheme && (
           <button
@@ -342,7 +439,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = React.memo(({
           <button
             onClick={onOpenSettings}
             className="p-1.5 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:text-clinical-blue transition-colors shadow-xs shrink-0 cursor-pointer"
-            title="Appliance Settings, Font Size & Audio Calibration"
+            title="Appliance Settings, Auto-Lock & Audio Calibration"
           >
             <Settings className="w-3.5 h-3.5" />
           </button>
@@ -359,12 +456,10 @@ export const HeaderBar: React.FC<HeaderBarProps> = React.memo(({
     <BackendNodeModal
       isOpen={isBackendModalOpen}
       onClose={() => setIsBackendModalOpen(false)}
-      onConnected={(newUrl) => {
-        setBackendUrl(newUrl);
+      onConnected={() => {
         loadSpecs();
       }}
     />
     </>
   );
 });
-

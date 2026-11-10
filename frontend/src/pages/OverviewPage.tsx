@@ -41,6 +41,14 @@ import { MedicalKeywordHighlighter } from '../components/MedicalKeywordHighlight
 import { formatISTTime, formatISTDate, formatISTDateTime } from '../utils/time';
 import { PatientReportView } from '../components/PatientReportView';
 import { ClinicVaultLogoSVG } from '../components/ClinicVaultLogoSVG';
+import { 
+  saveDraft, 
+  getDraft, 
+  deleteDraft, 
+  saveOfflineEncounter, 
+  getOfflineEncounters,
+  queuePendingAction 
+} from '../services/indexedDbCache';
 
 interface OverviewPageProps {
   onNavigate: (page: PageId) => void;
@@ -315,48 +323,64 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
   const loadDynamicRoster = useCallback(async () => {
     try {
       const roster = await clinixApi.getPatients();
-      if (roster && roster.length > 0) {
-        const mapped: EncounterSummary[] = roster.map((p) => {
-          const enc = p.latest_encounter;
-          const vit = enc?.vitals || p.last_vitals;
-          return {
-            id: enc?.id || `ENC-${p.id}`,
-            patientId: p.id,
-            patientName: p.full_name || `${p.first_name} ${p.last_name}`,
-            mrn: p.mrn,
-            dob: p.dob || '1980-01-01',
-            chiefComplaint: enc?.chief_complaint || 'Clinical evaluation',
-            examRoom: enc?.exam_room || 'Exam Room 1',
-            status: (enc?.status === 'completed' ? 'Committed' : (enc?.status === 'in_progress' ? 'In Progress' : 'Ready for Review')) as EncounterSummary['status'],
-            timestamp: enc?.started_at ? formatISTTime(enc.started_at) : '10:00 AM IST',
-            vitals: {
-              bp: vit?.bp || '120/80',
-              hr: vit?.hr ? String(vit.hr) : '72',
-              spo2: vit?.spo2 ? String(vit.spo2) : '98%',
-              temp: vit?.temp ? String(vit.temp) : '98.6°F',
-              bmi: vit?.bmi ? String(vit.bmi) : '24.2',
-            },
-          };
-        });
+      const mapped: EncounterSummary[] = (roster && roster.length > 0)
+        ? roster.map((p) => {
+            const enc = p.latest_encounter;
+            const vit = enc?.vitals || p.last_vitals;
+            return {
+              id: enc?.id || `ENC-${p.id}`,
+              patientId: p.id,
+              patientName: p.full_name || `${p.first_name} ${p.last_name}`,
+              mrn: p.mrn,
+              dob: p.dob || '1980-01-01',
+              chiefComplaint: enc?.chief_complaint || 'Clinical evaluation',
+              examRoom: enc?.exam_room || 'Exam Room 1',
+              status: (enc?.status === 'completed' ? 'Committed' : (enc?.status === 'in_progress' ? 'In Progress' : 'Ready for Review')) as EncounterSummary['status'],
+              timestamp: enc?.started_at ? formatISTTime(enc.started_at) : '10:00 AM IST',
+              vitals: {
+                bp: vit?.bp || '120/80',
+                hr: vit?.hr ? String(vit.hr) : '72',
+                spo2: vit?.spo2 ? String(vit.spo2) : '98%',
+                temp: vit?.temp ? String(vit.temp) : '98.6°F',
+                bmi: vit?.bmi ? String(vit.bmi) : '24.2',
+              },
+            };
+          })
+        : [];
 
-        const activeList = mapped.filter((m) => !completedIds.includes(m.id));
-        setEncounters((prev) => {
-          if (
-            prev.length === activeList.length &&
-            prev.every((p, idx) => p.id === activeList[idx].id && p.status === activeList[idx].status && p.patientName === activeList[idx].patientName)
-          ) {
-            return prev;
-          }
-          return activeList;
-        });
-        setSelectedEncounter((curr) => {
-          if (curr && activeList.some((m) => m.id === curr.id)) return curr;
-          return activeList[0] || null;
-        });
-      } else {
-        setEncounters([]);
-        setSelectedEncounter(null);
-      }
+      // Merge offline encounters saved in IndexedDB
+      const offline = await getOfflineEncounters();
+      const offlineMapped: EncounterSummary[] = offline
+        .filter((o) => !o.synced && !mapped.some((m) => m.patientId === o.patientId || m.id === o.id))
+        .map((o) => ({
+          id: o.id,
+          patientId: o.patientId,
+          patientName: o.patientName,
+          mrn: o.mrn,
+          dob: o.dob,
+          chiefComplaint: o.chiefComplaint,
+          examRoom: o.examRoom,
+          status: (o.status as any) || 'In Progress',
+          timestamp: o.timestamp || 'Offline Saved',
+          vitals: o.vitals,
+        }));
+
+      const combinedList = [...offlineMapped, ...mapped];
+      const activeList = combinedList.filter((m) => !completedIds.includes(m.id));
+
+      setEncounters((prev) => {
+        if (
+          prev.length === activeList.length &&
+          prev.every((p, idx) => p.id === activeList[idx].id && p.status === activeList[idx].status && p.patientName === activeList[idx].patientName)
+        ) {
+          return prev;
+        }
+        return activeList;
+      });
+      setSelectedEncounter((curr) => {
+        if (curr && activeList.some((m) => m.id === curr.id)) return curr;
+        return activeList[0] || null;
+      });
     } catch (err) {
       console.warn('Could not load dynamic roster for Overview:', err);
     }
@@ -435,7 +459,58 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
         void loadDynamicRoster();
       }
     } catch (err: any) {
-      setRegisterError(err?.message || 'Failed to register patient.');
+      console.warn('Backend unavailable, saving offline encounter to IndexedDB cache:', err);
+      const tempId = `offline-${Date.now()}`;
+      const patientFullName = `${registerForm.firstName.trim()} ${registerForm.lastName.trim()}`;
+      const newEnc: EncounterSummary = {
+        id: `ENC-${tempId}`,
+        patientId: tempId,
+        patientName: patientFullName,
+        mrn: registerForm.mrn.trim() || `MRN-${Math.floor(100000 + Math.random() * 900000)}`,
+        dob: registerForm.dob || '1980-01-01',
+        chiefComplaint: registerForm.chiefComplaint.trim() || 'Clinical evaluation',
+        examRoom: registerForm.examRoom.trim() || 'Exam Room 1',
+        status: 'In Progress',
+        timestamp: 'Offline Saved',
+        vitals: {
+          bp: '120/80',
+          hr: '72',
+          spo2: '98%',
+          temp: '98.6°F',
+          bmi: '24.0',
+        },
+      };
+
+      await saveOfflineEncounter({
+        id: newEnc.id,
+        patientId: newEnc.patientId || tempId,
+        patientName: newEnc.patientName,
+        mrn: newEnc.mrn,
+        dob: newEnc.dob,
+        chiefComplaint: newEnc.chiefComplaint,
+        examRoom: newEnc.examRoom,
+        status: 'In Progress',
+        vitals: newEnc.vitals,
+        timestamp: 'Offline Saved',
+        createdAt: Date.now(),
+        synced: false,
+      });
+
+      await queuePendingAction('encounter', newEnc.patientId || tempId, newEnc.patientName, registerForm);
+
+      setEncounters((prev) => [newEnc, ...prev.filter(x => x.id !== newEnc.id)]);
+      selectEncounter(newEnc);
+      setCarouselStartIndex(0);
+      setIsRegisterOpen(false);
+      setRegisterForm({
+        firstName: '',
+        lastName: '',
+        dob: '1980-01-01',
+        gender: 'female',
+        mrn: '',
+        chiefComplaint: '',
+        examRoom: 'Exam Room 1',
+      });
     } finally {
       setIsRegistering(false);
     }
@@ -443,21 +518,87 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
 
   const selectEncounter = useCallback((enc: EncounterSummary | null) => {
     setSelectedEncounter(enc);
-    setTranscriptTurns([]);
-    setSoapData({
-      subjective: '',
-      objective: '',
-      assessment: '',
-      plan: '',
-    });
-    setPatientReport(null);
     setIsStreamingAudio(false);
+
+    if (!enc) {
+      setTranscriptTurns([]);
+      setSoapData({ subjective: '', objective: '', assessment: '', plan: '' });
+      setPatientReport(null);
+      return;
+    }
+
+    // Attempt to restore in-flight draft from IndexedDB
+    const lookupDraft = async () => {
+      let draft = await getDraft('soap', enc.id);
+      if (!draft && enc.patientId && enc.patientId !== enc.id) {
+        draft = await getDraft('soap', enc.patientId);
+      }
+      return draft;
+    };
+
+    void lookupDraft().then((draft) => {
+      if (draft && draft.data) {
+        setSoapData(draft.data.soapData || { subjective: '', objective: '', assessment: '', plan: '' });
+        setTranscriptTurns(draft.data.transcriptTurns || []);
+        if (draft.data.patientReport) setPatientReport(draft.data.patientReport);
+        if (draft.data.billingCodes) setBillingCodes(draft.data.billingCodes);
+      } else {
+        setTranscriptTurns([]);
+        setSoapData({ subjective: '', objective: '', assessment: '', plan: '' });
+        setPatientReport(null);
+      }
+    }).catch(() => {
+      setTranscriptTurns([]);
+      setSoapData({ subjective: '', objective: '', assessment: '', plan: '' });
+      setPatientReport(null);
+    });
   }, []);
+
+  // Auto-save in-flight SOAP note & dialogue to IndexedDB cache
+  useEffect(() => {
+    if (!selectedEncounter) return;
+    const hasContent =
+      soapData.subjective ||
+      soapData.objective ||
+      soapData.assessment ||
+      soapData.plan ||
+      transcriptTurns.length > 0;
+
+    if (!hasContent) return;
+
+    const timer = setTimeout(() => {
+      void saveDraft(
+        'soap',
+        selectedEncounter.id,
+        selectedEncounter.patientName,
+        {
+          soapData,
+          transcriptTurns,
+          patientReport,
+          billingCodes,
+        },
+        selectedEncounter.id
+      );
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [
+    selectedEncounter,
+    soapData.subjective,
+    soapData.objective,
+    soapData.assessment,
+    soapData.plan,
+    transcriptTurns,
+    patientReport,
+    billingCodes,
+  ]);
 
   const handleCompleteEncounter = (encId: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     const target = encounters.find((enc) => enc.id === encId);
     if (!target) return;
+    deleteDraft('soap', encId);
+    if (target.patientId) deleteDraft('soap', target.patientId);
     const nextList = encounters.filter((enc) => enc.id !== encId);
     setEncounters(nextList);
     setLastDischarged(target);

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, 
@@ -10,10 +10,15 @@ import {
   Zap, 
   ShieldCheck, 
   Check, 
-  Database
+  Database,
+  Lock,
+  RefreshCw,
+  HardDrive
 } from 'lucide-react';
 import { AppSettings, HardwareSpecs } from '../types';
 import { clinixApi } from '../services/api';
+import { useVaultLock } from '../context/VaultLockContext';
+import { getCacheTelemetry, syncPendingActions, CacheTelemetry } from '../services/indexedDbCache';
 
 interface AudioDeviceOption {
   deviceId: string;
@@ -35,12 +40,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onUpdateSettings,
   onOpenModelManager,
 }) => {
-  const [hardware, setHardware] = React.useState<HardwareSpecs | null>(null);
-  const [audioDevices, setAudioDevices] = React.useState<AudioDeviceOption[]>([]);
+  const [hardware, setHardware] = useState<HardwareSpecs | null>(null);
+  const [audioDevices, setAudioDevices] = useState<AudioDeviceOption[]>([]);
+  const [cacheStats, setCacheStats] = useState<CacheTelemetry | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [newPinInput, setNewPinInput] = useState('');
+  const [pinSavedMsg, setPinSavedMsg] = useState(false);
 
-  React.useEffect(() => {
+  const { autoLockMinutes, setAutoLockMinutes, quickPin, setQuickPin, lockVault } = useVaultLock();
+
+  const loadCacheTelemetry = () => {
+    getCacheTelemetry().then(setCacheStats).catch(() => {});
+  };
+
+  useEffect(() => {
     if (isOpen) {
       clinixApi.getHardwareSpecs().then(setHardware).catch(() => {});
+      loadCacheTelemetry();
+      setNewPinInput('');
 
       if (navigator.mediaDevices?.enumerateDevices) {
         navigator.mediaDevices
@@ -56,8 +73,43 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           })
           .catch((err) => console.warn('Audio device enumeration error:', err));
       }
+
+      const handleCacheEvt = () => loadCacheTelemetry();
+      window.addEventListener('clinixvault:draft_saved', handleCacheEvt);
+      window.addEventListener('clinixvault:draft_deleted', handleCacheEvt);
+      window.addEventListener('clinixvault:cache_synced', handleCacheEvt);
+      window.addEventListener('clinixvault:pending_queued', handleCacheEvt);
+
+      return () => {
+        window.removeEventListener('clinixvault:draft_saved', handleCacheEvt);
+        window.removeEventListener('clinixvault:draft_deleted', handleCacheEvt);
+        window.removeEventListener('clinixvault:cache_synced', handleCacheEvt);
+        window.removeEventListener('clinixvault:pending_queued', handleCacheEvt);
+      };
     }
   }, [isOpen]);
+
+  const handleManualSync = async () => {
+    setIsSyncing(true);
+    try {
+      await syncPendingActions(clinixApi);
+      loadCacheTelemetry();
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleSavePin = () => {
+    const clean = newPinInput.trim();
+    if (clean.length === 4 && /^\d{4}$/.test(clean)) {
+      setQuickPin(clean);
+      setPinSavedMsg(true);
+      setNewPinInput('');
+      setTimeout(() => setPinSavedMsg(false), 2000);
+    } else {
+      alert('Quick PIN must be exactly 4 numeric digits.');
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -99,7 +151,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
             <button
               onClick={onClose}
-              className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -116,7 +168,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <button
                   type="button"
                   onClick={() => onUpdateSettings({ darkMode: false })}
-                  className={`flex items-center justify-between p-4 rounded-2xl border text-left transition-all ${
+                  className={`flex items-center justify-between p-4 rounded-2xl border text-left transition-all cursor-pointer ${
                     !settings.darkMode
                       ? 'border-clinical-blue bg-blue-50/60 dark:bg-blue-900/20 text-slate-900 font-semibold shadow-sm ring-1 ring-clinical-blue'
                       : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 text-slate-600 dark:text-slate-400'
@@ -137,7 +189,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <button
                   type="button"
                   onClick={() => onUpdateSettings({ darkMode: true })}
-                  className={`flex items-center justify-between p-4 rounded-2xl border text-left transition-all ${
+                  className={`flex items-center justify-between p-4 rounded-2xl border text-left transition-all cursor-pointer ${
                     settings.darkMode
                       ? 'border-clinical-blue bg-blue-50/60 dark:bg-blue-900/30 text-slate-900 dark:text-white font-semibold shadow-sm ring-1 ring-clinical-blue'
                       : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 text-slate-600 dark:text-slate-400'
@@ -157,7 +209,129 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
             </div>
 
-            {/* 2. Font Size Scaling */}
+            {/* 2. Session Vault Auto-Lock & PHI Inactivity Security (§164.312) */}
+            <div className="p-4 rounded-2xl bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/20 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <Lock className="w-4 h-4 text-amber-500" />
+                  <div>
+                    <span className="text-sm font-bold text-slate-800 dark:text-slate-200 block">
+                      Session Vault Auto-Lock (§164.312 Standard)
+                    </span>
+                    <span className="text-[11px] text-slate-500">
+                      Protects patient PHI on unattended hospital edge terminals without losing in-flight state.
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    lockVault('Manual Lock from Settings');
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 text-xs font-bold transition-all border border-amber-500/30 cursor-pointer"
+                >
+                  Lock Vault Now
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 block">
+                    Inactivity Lock Timeout
+                  </label>
+                  <select
+                    value={autoLockMinutes}
+                    onChange={(e) => setAutoLockMinutes(parseInt(e.target.value, 10))}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 text-xs font-semibold cursor-pointer focus:outline-none focus:ring-2 focus:ring-clinical-blue"
+                  >
+                    <option value={1}>1 Minute (Fast QA / Demo Test)</option>
+                    <option value={5}>5 Minutes (High Security ER)</option>
+                    <option value={10}>10 Minutes</option>
+                    <option value={15}>15 Minutes (Standard Hospital Default)</option>
+                    <option value={30}>30 Minutes</option>
+                    <option value={0}>Disabled (Not recommended)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 block">
+                    Quick Re-Authentication PIN (4 Digits)
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="password"
+                      maxLength={4}
+                      value={newPinInput}
+                      onChange={(e) => setNewPinInput(e.target.value.replace(/\D/g, ''))}
+                      placeholder={quickPin === '1234' ? '1234' : '••••'}
+                      className="flex-1 px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 text-xs font-mono tracking-widest text-center focus:outline-none focus:ring-2 focus:ring-clinical-blue"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleSavePin}
+                      className="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer border border-slate-200 dark:border-slate-700"
+                    >
+                      {pinSavedMsg ? 'Saved!' : 'Save PIN'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 3. Client IndexedDB Zero-Egress Persistent Cache */}
+            <div className="p-4 rounded-2xl bg-blue-500/5 dark:bg-blue-500/10 border border-blue-500/20 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <HardDrive className="w-4 h-4 text-clinical-blue" />
+                  <div>
+                    <span className="text-sm font-bold text-slate-800 dark:text-slate-200 block">
+                      Client Zero-Egress Cache (IndexedDB)
+                    </span>
+                    <span className="text-[11px] text-slate-500">
+                      Sovereign client storage for in-flight drafts, offline encounters, and pending reports.
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleManualSync}
+                  disabled={isSyncing}
+                  className="px-3 py-1.5 rounded-xl bg-clinical-blue/10 hover:bg-clinical-blue/20 text-clinical-blue text-xs font-bold transition-all border border-clinical-blue/30 cursor-pointer flex items-center gap-1.5"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                  <span>Sync Pending Data</span>
+                </button>
+              </div>
+
+              {cacheStats && (
+                <div className="grid grid-cols-3 gap-2.5 pt-1 text-center">
+                  <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                    <div className="text-base font-extrabold text-slate-900 dark:text-white font-mono">
+                      {cacheStats.draftsCount}
+                    </div>
+                    <div className="text-[10px] text-slate-500 font-medium mt-0.5">Local Drafts</div>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                    <div className={`text-base font-extrabold font-mono ${
+                      cacheStats.pendingCount > 0 ? 'text-amber-500' : 'text-emerald-500'
+                    }`}>
+                      {cacheStats.pendingCount}
+                    </div>
+                    <div className="text-[10px] text-slate-500 font-medium mt-0.5">Pending Sync</div>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                    <div className="text-base font-extrabold text-slate-900 dark:text-white font-mono">
+                      {cacheStats.offlineEncountersCount}
+                    </div>
+                    <div className="text-[10px] text-slate-500 font-medium mt-0.5">Offline Encounters</div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 4. Font Size Scaling */}
             <div>
               <label className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-3 block">
                 Typography Scale (Fira Sans)
@@ -174,7 +348,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       key={scale.id}
                       type="button"
                       onClick={() => onUpdateSettings({ fontSize: scale.id as AppSettings['fontSize'] })}
-                      className={`p-3.5 rounded-2xl border text-left transition-all ${
+                      className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
                         isSelected
                           ? 'border-clinical-blue bg-blue-50/60 dark:bg-blue-900/30 text-slate-900 dark:text-white ring-1 ring-clinical-blue font-semibold'
                           : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 text-slate-600 dark:text-slate-400'
@@ -192,7 +366,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
             </div>
 
-            {/* 3. Audio & ASR Calibration */}
+            {/* 5. Audio & ASR Calibration */}
             <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
@@ -251,21 +425,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </button>
               </div>
 
-              <div className="p-3 rounded-xl bg-blue-50/60 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/40 text-[11px] text-slate-600 dark:text-slate-300 space-y-1">
-                <p className="font-semibold text-clinical-blue dark:text-sky-400">
-                  🎙️ Hardware Microphone Routing Guide:
-                </p>
-                <p>
-                  • <strong>Is this using our device mic?</strong> Yes! ClinixVault captures live ambient dialogue directly from your computer's built-in microphone (or any connected hardware).
-                </p>
-                <p>
-                  • <strong>What are the dropdown options?</strong> They list all physical audio input devices detected by your operating system (e.g. MacBook Pro Microphone, external USB mic, AirPods, or clinical room boundary microphone).
-                </p>
-                <p>
-                  • <strong>How to use them:</strong> Select your preferred device from the list. The selected input will be locked as the audio source streamed to the Faster-Whisper ASR pipeline.
-                </p>
-              </div>
-
               <div>
                 <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-400 mb-1">
                   <span>Whisper ASR Temperature</span>
@@ -280,15 +439,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   onChange={(e) => onUpdateSettings({ whisperTemperature: parseFloat(e.target.value) })}
                   className="w-full accent-clinical-blue cursor-pointer"
                 />
-                <div className="flex justify-between text-[10px] text-slate-400 mt-0.5">
-                  <span>0.0 (Strict Verbatim)</span>
-                  <span>0.4 (Balanced)</span>
-                  <span>0.8 (Exploratory)</span>
-                </div>
               </div>
             </div>
 
-            {/* 4. Local Model Architecture & Hardware Acceleration */}
+            {/* 6. Local Model Architecture & Hardware Acceleration */}
             <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
@@ -360,7 +514,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </span>
             <button
               onClick={onClose}
-              className="px-5 py-2.5 rounded-xl bg-clinical-blue hover:bg-clinical-dark text-white font-semibold text-sm transition-all shadow-md shadow-blue-500/20"
+              className="px-5 py-2.5 rounded-xl bg-clinical-blue hover:bg-clinical-dark text-white font-semibold text-sm transition-all shadow-md shadow-blue-500/20 cursor-pointer"
             >
               Done & Save
             </button>

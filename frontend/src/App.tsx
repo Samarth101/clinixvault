@@ -9,6 +9,9 @@ import { CommandPaletteModal } from './components/CommandPaletteModal';
 import { ModelManagerModal } from './components/ModelManagerModal';
 import { ClinicalExportModal } from './components/ClinicalExportModal';
 import { telemetry } from './services/telemetry';
+import { failoverAgent } from './services/nodeFailoverAgent';
+import { setupAutoSync } from './services/indexedDbCache';
+import { clinixApi } from './services/api';
 
 // Pages
 import { LandingPage } from './pages/LandingPage';
@@ -22,9 +25,11 @@ import { StaffManagementPage } from './pages/StaffManagementPage';
 import { KnowledgeGraphPage } from './pages/KnowledgeGraphPage';
 import { PatientsPage } from './pages/PatientsPage';
 
-// Auth
+// Auth & Security Lock
 import { AuthProvider } from './context/AuthContext';
+import { VaultLockProvider } from './context/VaultLockContext';
 import { LoginModal } from './components/LoginModal';
+import { SessionVaultLockModal } from './components/SessionVaultLockModal';
 
 const VALID_PAGES: PageId[] = ['landing', 'overview', 'patients', 'provenance', 'radiology', 'summarizer', 'hardware', 'staff', 'graph'];
 
@@ -51,6 +56,37 @@ export const App: React.FC = () => {
     };
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  // Failover Agent & IndexedDB Auto-Sync Setup
+  useEffect(() => {
+    const stopFailover = failoverAgent.start();
+    const stopAutoSync = setupAutoSync(clinixApi);
+
+    const handleFailoverNotice = (e: any) => {
+      const { to, reason } = e.detail || {};
+      if (to === 'local') {
+        setExportNotice(`⚡ Dual-Node Failover: Active inference switched to Local Edge (${reason})`);
+      } else if (to === 'colab') {
+        setExportNotice('⚡ Failback: Active inference reconnected to Colab GPU Node');
+      }
+      setTimeout(() => setExportNotice(null), 4500);
+    };
+
+    const handleColabRecovered = (e: any) => {
+      setExportNotice(`⚡ Colab GPU tunnel responsive (${e.detail?.latencyMs}ms). Ready for switch.`);
+      setTimeout(() => setExportNotice(null), 4000);
+    };
+
+    window.addEventListener('clinixvault:failover_event', handleFailoverNotice);
+    window.addEventListener('clinixvault:colab_recovered', handleColabRecovered);
+
+    return () => {
+      stopFailover();
+      stopAutoSync();
+      window.removeEventListener('clinixvault:failover_event', handleFailoverNotice);
+      window.removeEventListener('clinixvault:colab_recovered', handleColabRecovered);
+    };
   }, []);
 
   const navigateToPage = useCallback((page: PageId) => {
@@ -134,213 +170,217 @@ export const App: React.FC = () => {
 
   return (
     <AuthProvider>
-      <div className="min-h-screen relative font-sans text-slate-800 dark:text-slate-100 antialiased selection:bg-clinical-blue/20 selection:text-clinical-blue transition-colors duration-300">
-        {/* Toast Notification */}
-        <AnimatePresence>
-          {exportNotice && (
-            <motion.div
-              initial={{ opacity: 0, y: -20, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -20, scale: 0.95 }}
-              className="fixed top-6 right-6 z-50 px-4 py-3 bg-slate-900 text-white rounded-2xl shadow-2xl border border-slate-700 flex items-center gap-2.5 text-xs sm:text-sm font-semibold"
-            >
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>{exportNotice}</span>
-            </motion.div>
-          )}
-        </AnimatePresence>
+      <VaultLockProvider>
+        <div className="min-h-screen relative font-sans text-slate-800 dark:text-slate-100 antialiased selection:bg-clinical-blue/20 selection:text-clinical-blue transition-colors duration-300">
+          {/* Toast Notification */}
+          <AnimatePresence>
+            {exportNotice && (
+              <motion.div
+                initial={{ opacity: 0, y: -20, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -20, scale: 0.95 }}
+                className="fixed top-6 right-6 z-50 px-4 py-3 bg-slate-900 text-white rounded-2xl shadow-2xl border border-slate-700 flex items-center gap-2.5 text-xs sm:text-sm font-semibold"
+              >
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>{exportNotice}</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-        {/* When on Landing Page: render full width high-impact landing with pinned scroll */}
-        {activePage === 'landing' ? (
-          <LandingPage
-            onLaunchWorkstation={(page) => navigateToPage(page || 'overview')}
-            isDarkMode={settings.darkMode}
-            onToggleTheme={toggleTheme}
-          />
-        ) : (
-          <>
-            {/* Floating Left Navigation Sidebar with Inactivity Auto-Hide & Spring Pop-Up */}
-            <Sidebar
-              activePage={activePage}
-              onSelectPage={(page) => navigateToPage(page)}
-              onOpenSafetyModal={() => setIsSafetyModalOpen(true)}
-              onVisibilityChange={setIsDockVisible}
+          {/* When on Landing Page: render full width high-impact landing with pinned scroll */}
+          {activePage === 'landing' ? (
+            <LandingPage
+              onLaunchWorkstation={(page) => navigateToPage(page || 'overview')}
+              isDarkMode={settings.darkMode}
+              onToggleTheme={toggleTheme}
             />
-
-            {/* Main Content Area: Smooth responsive padding transition based on sidebar visibility */}
-            <div className={`transition-all duration-300 ease-out pr-6 sm:pr-12 pt-3 max-w-[1640px] w-full mx-auto flex flex-col h-screen overflow-hidden ${
-              isDockVisible ? 'pl-24 sm:pl-32' : 'pl-8 sm:pl-14'
-            }`}>
-              {/* Global Executive Clinical Header Bar */}
-              <HeaderBar
-                onOpenSafetyModal={handleOpenSafetyModal}
-                onOpenSettings={handleOpenSettings}
-                onOpenCommandPalette={handleOpenCommandPalette}
-                onOpenModelManager={handleOpenModelManager}
-                onNavigateLanding={handleNavigateLanding}
-                isDarkMode={settings.darkMode}
-                onToggleTheme={toggleTheme}
-                onExportNote={handleExportNote}
+          ) : (
+            <>
+              {/* Floating Left Navigation Sidebar with Inactivity Auto-Hide & Spring Pop-Up */}
+              <Sidebar
+                activePage={activePage}
+                onSelectPage={(page) => navigateToPage(page)}
+                onOpenSafetyModal={() => setIsSafetyModalOpen(true)}
+                onVisibilityChange={setIsDockVisible}
               />
 
-              {/* Dynamic Page Routing with Framer Motion Page Transition */}
-              <main className="flex-1 overflow-y-auto pb-16 pr-1 custom-scrollbar">
-                <ErrorBoundary onReset={() => navigateToPage('overview')}>
-                  <AnimatePresence mode="wait">
-                  {activePage === 'overview' && (
-                    <motion.div
-                      key="overview"
-                      initial={{ opacity: 0, y: 12 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -12 }}
-                      transition={{ duration: 0.25, ease: "easeOut" }}
-                    >
-                      <OverviewPage
-                        onNavigate={(page) => navigateToPage(page)}
-                        onOpenSafetyModal={() => setIsSafetyModalOpen(true)}
-                        onOpenModelManager={() => setIsModelManagerOpen(true)}
-                      />
-                    </motion.div>
-                  )}
+              {/* Main Content Area: Smooth responsive padding transition based on sidebar visibility */}
+              <div className={`transition-all duration-300 ease-out pr-6 sm:pr-12 pt-3 max-w-[1640px] w-full mx-auto flex flex-col h-screen overflow-hidden ${
+                isDockVisible ? 'pl-24 sm:pl-32' : 'pl-8 sm:pl-14'
+              }`}>
+                {/* Global Executive Clinical Header Bar */}
+                <HeaderBar
+                  onOpenSafetyModal={handleOpenSafetyModal}
+                  onOpenSettings={handleOpenSettings}
+                  onOpenCommandPalette={handleOpenCommandPalette}
+                  onOpenModelManager={handleOpenModelManager}
+                  onNavigateLanding={handleNavigateLanding}
+                  isDarkMode={settings.darkMode}
+                  onToggleTheme={toggleTheme}
+                  onExportNote={handleExportNote}
+                />
 
-                  {activePage === 'patients' && (
-                    <motion.div
-                      key="patients"
-                      initial={{ opacity: 0, y: 12 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -12 }}
-                      transition={{ duration: 0.25, ease: "easeOut" }}
-                    >
-                      <PatientsPage onNavigate={(page) => navigateToPage(page)} />
-                    </motion.div>
-                  )}
+                {/* Dynamic Page Routing with Framer Motion Page Transition */}
+                <main className="flex-1 overflow-y-auto pb-16 pr-1 custom-scrollbar">
+                  <ErrorBoundary onReset={() => navigateToPage('overview')}>
+                    <AnimatePresence mode="wait">
+                    {activePage === 'overview' && (
+                      <motion.div
+                        key="overview"
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -12 }}
+                        transition={{ duration: 0.25, ease: "easeOut" }}
+                      >
+                        <OverviewPage
+                          onNavigate={(page) => navigateToPage(page)}
+                          onOpenSafetyModal={() => setIsSafetyModalOpen(true)}
+                          onOpenModelManager={() => setIsModelManagerOpen(true)}
+                        />
+                      </motion.div>
+                    )}
 
-                  {activePage === 'provenance' && (
-                    <motion.div
-                      key="provenance"
-                      initial={{ opacity: 0, y: 12 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -12 }}
-                      transition={{ duration: 0.25, ease: "easeOut" }}
-                    >
-                      <ProvenanceFHIRPage onNavigate={(page) => navigateToPage(page)} />
-                    </motion.div>
-                  )}
+                    {activePage === 'patients' && (
+                      <motion.div
+                        key="patients"
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -12 }}
+                        transition={{ duration: 0.25, ease: "easeOut" }}
+                      >
+                        <PatientsPage onNavigate={(page) => navigateToPage(page)} />
+                      </motion.div>
+                    )}
 
-                  {activePage === 'graph' && (
-                    <motion.div
-                      key="graph"
-                      initial={{ opacity: 0, y: 12 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -12 }}
-                      transition={{ duration: 0.25, ease: "easeOut" }}
-                    >
-                      <KnowledgeGraphPage />
-                    </motion.div>
-                  )}
+                    {activePage === 'provenance' && (
+                      <motion.div
+                        key="provenance"
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -12 }}
+                        transition={{ duration: 0.25, ease: "easeOut" }}
+                      >
+                        <ProvenanceFHIRPage onNavigate={(page) => navigateToPage(page)} />
+                      </motion.div>
+                    )}
 
-                  {activePage === 'radiology' && (
-                    <motion.div
-                      key="radiology"
-                      initial={{ opacity: 0, y: 12 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -12 }}
-                      transition={{ duration: 0.25, ease: "easeOut" }}
-                    >
-                      <RadiologyStudioPage
-                        onOpenModelManager={() => setIsModelManagerOpen(true)}
-                        onNavigate={(page) => navigateToPage(page)}
-                      />
-                    </motion.div>
-                  )}
+                    {activePage === 'graph' && (
+                      <motion.div
+                        key="graph"
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -12 }}
+                        transition={{ duration: 0.25, ease: "easeOut" }}
+                      >
+                        <KnowledgeGraphPage />
+                      </motion.div>
+                    )}
 
-                  {activePage === 'summarizer' && (
-                    <motion.div
-                      key="summarizer"
-                      initial={{ opacity: 0, y: 12 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -12 }}
-                      transition={{ duration: 0.25, ease: "easeOut" }}
-                    >
-                      <DocumentSummarizerPage />
-                    </motion.div>
-                  )}
+                    {activePage === 'radiology' && (
+                      <motion.div
+                        key="radiology"
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -12 }}
+                        transition={{ duration: 0.25, ease: "easeOut" }}
+                      >
+                        <RadiologyStudioPage
+                          onOpenModelManager={() => setIsModelManagerOpen(true)}
+                          onNavigate={(page) => navigateToPage(page)}
+                        />
+                      </motion.div>
+                    )}
 
-                  {activePage === 'hardware' && (
-                    <motion.div
-                      key="hardware"
-                      initial={{ opacity: 0, y: 12 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -12 }}
-                      transition={{ duration: 0.25, ease: "easeOut" }}
-                    >
-                      <HardwareSizingPage />
-                    </motion.div>
-                  )}
+                    {activePage === 'summarizer' && (
+                      <motion.div
+                        key="summarizer"
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -12 }}
+                        transition={{ duration: 0.25, ease: "easeOut" }}
+                      >
+                        <DocumentSummarizerPage />
+                      </motion.div>
+                    )}
 
-                  {activePage === 'staff' && (
-                    <motion.div
-                      key="staff"
-                      initial={{ opacity: 0, y: 12 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -12 }}
-                      transition={{ duration: 0.25, ease: "easeOut" }}
-                    >
-                      <StaffManagementPage />
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </ErrorBoundary>
-            </main>
-            </div>
-          </>
-        )}
+                    {activePage === 'hardware' && (
+                      <motion.div
+                        key="hardware"
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -12 }}
+                        transition={{ duration: 0.25, ease: "easeOut" }}
+                      >
+                        <HardwareSizingPage />
+                      </motion.div>
+                    )}
 
-        {/* Global Modals */}
-        <ProtocolZeroModal
-          isOpen={isSafetyModalOpen}
-          onClose={() => setIsSafetyModalOpen(false)}
-        />
+                    {activePage === 'staff' && (
+                      <motion.div
+                        key="staff"
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -12 }}
+                        transition={{ duration: 0.25, ease: "easeOut" }}
+                      >
+                        <StaffManagementPage />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </ErrorBoundary>
+              </main>
+              </div>
+            </>
+          )}
 
-        <SettingsModal
-          isOpen={isSettingsOpen}
-          onClose={() => setIsSettingsOpen(false)}
-          settings={settings}
-          onUpdateSettings={handleUpdateSettings}
-        />
+          {/* Global Modals */}
+          <ProtocolZeroModal
+            isOpen={isSafetyModalOpen}
+            onClose={() => setIsSafetyModalOpen(false)}
+          />
 
-        <CommandPaletteModal
-          isOpen={isCommandPaletteOpen}
-          onClose={() => setIsCommandPaletteOpen(false)}
-          onSelectPage={(page) => navigateToPage(page)}
-          onToggleTheme={toggleTheme}
-          isDarkMode={settings.darkMode}
-          onOpenSettings={() => setIsSettingsOpen(true)}
-          onOpenSafetyModal={() => setIsSafetyModalOpen(true)}
-          onOpenModelManager={() => setIsModelManagerOpen(true)}
-        />
+          <SettingsModal
+            isOpen={isSettingsOpen}
+            onClose={() => setIsSettingsOpen(false)}
+            settings={settings}
+            onUpdateSettings={handleUpdateSettings}
+          />
 
-        <ModelManagerModal
-          isOpen={isModelManagerOpen}
-          onClose={() => setIsModelManagerOpen(false)}
-          selectedVllmModel={settings.selectedVllmModel}
-          onSelectVllmModel={(model) => handleUpdateSettings({ selectedVllmModel: model })}
-        />
+          <CommandPaletteModal
+            isOpen={isCommandPaletteOpen}
+            onClose={() => setIsCommandPaletteOpen(false)}
+            onSelectPage={(page) => navigateToPage(page)}
+            onToggleTheme={toggleTheme}
+            isDarkMode={settings.darkMode}
+            onOpenSettings={() => setIsSettingsOpen(true)}
+            onOpenSafetyModal={() => setIsSafetyModalOpen(true)}
+            onOpenModelManager={() => setIsModelManagerOpen(true)}
+          />
 
-        <ClinicalExportModal
-          isOpen={isExportModalOpen}
-          onClose={() => setIsExportModalOpen(false)}
-          onExportComplete={(notice) => {
-            setExportNotice(notice);
-            setTimeout(() => setExportNotice(null), 3000);
-          }}
-        />
+          <ModelManagerModal
+            isOpen={isModelManagerOpen}
+            onClose={() => setIsModelManagerOpen(false)}
+            selectedVllmModel={settings.selectedVllmModel}
+            onSelectVllmModel={(model) => handleUpdateSettings({ selectedVllmModel: model })}
+          />
 
-        <LoginModal />
-      </div>
+          <ClinicalExportModal
+            isOpen={isExportModalOpen}
+            onClose={() => setIsExportModalOpen(false)}
+            onExportComplete={(notice) => {
+              setExportNotice(notice);
+              setTimeout(() => setExportNotice(null), 3000);
+            }}
+          />
+
+          <LoginModal />
+
+          {/* Session Vault Auto-Lock Overlay */}
+          <SessionVaultLockModal />
+        </div>
+      </VaultLockProvider>
     </AuthProvider>
   );
 };
 
 export default App;
-

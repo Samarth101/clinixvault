@@ -7,7 +7,8 @@ and live hardware telemetry (Apple Silicon / Unified Memory / CUDA).
 import time
 import httpx
 import psutil
-from typing import Dict, Any
+import asyncio
+from typing import Dict, Any, Tuple, Optional
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -20,7 +21,7 @@ from inference.shared.hardware import get_hardware_specs
 router = APIRouter(prefix="/api/v1", tags=["Health"])
 
 
-async def ping_service(url: str, timeout: float = 1.0) -> Dict[str, Any]:
+async def ping_service(url: str, timeout: float = 0.25) -> Dict[str, Any]:
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:
             resp = await client.get(f"{url}/health")
@@ -29,6 +30,17 @@ async def ping_service(url: str, timeout: float = 1.0) -> Dict[str, Any]:
             return {"status": "degraded", "http_code": resp.status_code}
     except Exception:
         return {"status": "unreachable", "url": url}
+
+
+async def ping_ollama(timeout: float = 0.25) -> Tuple[bool, Optional[str]]:
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            o_resp = await client.get("http://127.0.0.1:11434/api/version")
+            if o_resp.status_code == 200:
+                return True, o_resp.json().get("version")
+    except Exception:
+        pass
+    return False, None
 
 
 @router.get("/health")
@@ -41,23 +53,14 @@ async def get_gateway_system_health(db: Session = Depends(get_db)):
     except Exception:
         db_ok = False
 
-    # 2. Downstream service pings
-    vlm_status = await ping_service(settings.VLM_URL)
-    llm_status = await ping_service(settings.LLM_URL)
-    audio_status = await ping_service(settings.AUDIO_URL)
-    doc_status = await ping_service(settings.DOCUMENT_URL)
-
-    # 3. Ollama check
-    ollama_ok = False
-    ollama_version = None
-    try:
-        async with httpx.AsyncClient(timeout=1.0) as client:
-            o_resp = await client.get("http://127.0.0.1:11434/api/version")
-            if o_resp.status_code == 200:
-                ollama_ok = True
-                ollama_version = o_resp.json().get("version")
-    except Exception:
-        ollama_ok = False
+    # 2. Downstream service pings & Ollama concurrently with sub-300ms SLA
+    vlm_status, llm_status, audio_status, doc_status, (ollama_ok, ollama_version) = await asyncio.gather(
+        ping_service(settings.VLM_URL, timeout=0.25),
+        ping_service(settings.LLM_URL, timeout=0.25),
+        ping_service(settings.AUDIO_URL, timeout=0.25),
+        ping_service(settings.DOCUMENT_URL, timeout=0.25),
+        ping_ollama(timeout=0.25),
+    )
 
     # 4. Neo4j / Property Graph Engine check
     graph_ok = True

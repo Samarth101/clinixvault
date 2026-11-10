@@ -44,6 +44,7 @@ import { PatientReportView } from '../components/PatientReportView';
 import { clinixApi, IntervalTrajectory } from '../services/api';
 import { InstalledModel, PatientReport, AnatomicalBreakdown, CriticAudit, FineTunedModel } from '../types';
 import { ClinicVaultLogoSVG } from '../components/ClinicVaultLogoSVG';
+import { saveDraft, getDraft, queuePendingAction } from '../services/indexedDbCache';
 
 interface RadiologyStudioPageProps {
   onOpenModelManager?: () => void;
@@ -851,6 +852,22 @@ export const RadiologyStudioPage: React.FC<RadiologyStudioPageProps> = ({ onOpen
     loadDynamicCases();
   }, []);
 
+  // Restore saved in-flight radiology draft from IndexedDB cache
+  useEffect(() => {
+    if (!selectedCase?.id) return;
+    void getDraft('radiology', selectedCase.id).then((draft) => {
+      if (draft && draft.data && draft.data.findings && !selectedCase.findings) {
+        setSelectedCase((prev) => ({
+          ...prev,
+          findings: draft.data.findings,
+          impression: draft.data.impression || prev.impression,
+          pathologies: draft.data.pathologies || prev.pathologies,
+          patientReport: draft.data.patientReport || prev.patientReport,
+        }));
+      }
+    });
+  }, [selectedCase?.id]);
+
   const currentImageUrl = useMemo(() => {
     if (!selectedCase.id && !selectedCase.customImageUrl) {
       return '';
@@ -1049,8 +1066,8 @@ export const RadiologyStudioPage: React.FC<RadiologyStudioPageProps> = ({ onOpen
     setReportKey((k) => k + 1);
     setInferenceError(null);
 
+    let base64Image: string | undefined = undefined;
     try {
-      let base64Image: string | undefined = undefined;
       const activeImg = currentImageUrl;
       if (activeImg) {
         if (activeImg.startsWith('data:')) {
@@ -1088,6 +1105,13 @@ export const RadiologyStudioPage: React.FC<RadiologyStudioPageProps> = ({ onOpen
 
       setInferenceTime(response.inferenceTimeMs);
       if (response.status === 'error' || response.errorMessage) {
+        if (response.errorCategory === 'backend_offline') {
+          void queuePendingAction('radiology', selectedCase.id, selectedCase.patient, {
+            imageBase64: base64Image,
+            clinicalIndication: selectedCase.indication,
+            projection: selectedCase.projections?.[activeProjectionIdx]?.projection || "PA",
+          });
+        }
         setInferenceError({
           message: response.errorMessage || 'Clinical report generation failed on inference engine.',
           category: response.errorCategory || 'inference_failure',
@@ -1121,6 +1145,12 @@ export const RadiologyStudioPage: React.FC<RadiologyStudioPageProps> = ({ onOpen
 
         try {
           localStorage.setItem('clinixvault_last_radiology_study', JSON.stringify(updatedStudy));
+          void saveDraft('radiology', selectedCase.id, selectedCase.patient, {
+            findings: updatedStudy.findings,
+            impression: updatedStudy.impression,
+            pathologies: updatedStudy.pathologies,
+            patientReport: updatedStudy.patientReport,
+          });
         } catch {}
 
         setSelectedCase(updatedStudy);
@@ -1128,9 +1158,16 @@ export const RadiologyStudioPage: React.FC<RadiologyStudioPageProps> = ({ onOpen
         setCasesList((prev) => prev.map(c => c.id === selectedCase.id ? updatedStudy : c));
       }
     } catch (e: any) {
+      if (selectedCase?.id) {
+        void queuePendingAction('radiology', selectedCase.id, selectedCase.patient, {
+          imageBase64: base64Image,
+          clinicalIndication: selectedCase.indication,
+          projection: selectedCase.projections?.[activeProjectionIdx]?.projection || "PA",
+        });
+      }
       setInferenceError({
-        message: e?.message || 'An unexpected error occurred during inference.',
-        category: 'inference_failure',
+        message: e?.message ? `${e.message} (Queued to sovereign cache for auto-sync)` : 'Gateway unreachable. Study queued to IndexedDB sovereign cache for auto-sync.',
+        category: 'backend_offline',
       });
     } finally {
       setIsGenerating(false);
