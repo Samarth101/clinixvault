@@ -15,6 +15,7 @@ import numpy as np
 from PIL import Image
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Query, UploadFile, File, Form
 from fastapi.responses import FileResponse
+from starlette.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
 from backend.database.connection import get_db, SessionLocal
@@ -213,7 +214,8 @@ async def generate_radiology_report(
 
         if not service_contacted:
             manager = get_model_manager()
-            rad_result = manager.generate_radiology_report(
+            rad_result = await run_in_threadpool(
+                manager.generate_radiology_report,
                 image_base64=request.image_base64,
                 image_path=request.image_path,
                 clinical_history=request.clinical_indication or "",
@@ -221,6 +223,7 @@ async def generate_radiology_report(
                 model_name=request.model_name,
             )
             if getattr(rad_result, "error", None):
+
                 return rad_result
             findings, impression, full_report, model_version = rad_result
             anatomical_breakdown = getattr(rad_result, "anatomical_breakdown", {})
@@ -388,13 +391,15 @@ async def generate_radiology_report(
 
     # Generate Plain-Language Lay Audience Patient Explanation
     manager = get_model_manager()
-    patient_report_raw, _ = manager.generate_patient_report(
+    patient_report_raw, _ = await run_in_threadpool(
+        manager.generate_patient_report,
         clinical_text=full_report,
         report_type="radiology",
         clinical_indication=request.clinical_indication or "",
         model_name=request.model_name,
     )
     patient_report = enforce_6th_grade_layman_report(patient_report_raw, full_report)
+
 
     # Derive 2D Phrase Grounding Spatial Coordinates (SCOORD DCM:111030)
     spatial_coordinates = derive_spatial_coordinates(findings, impression)
@@ -622,13 +627,15 @@ async def simplify_radiology_report(
     """
     start_time = time.time()
     manager = get_model_manager()
-    raw_report, model_version = manager.generate_patient_report(
+    raw_report, model_version = await run_in_threadpool(
+        manager.generate_patient_report,
         clinical_text=request.clinical_text,
         report_type=request.report_type,
         clinical_indication=request.clinical_indication or "",
         model_name=request.model_name,
     )
     calibrated_report = enforce_6th_grade_layman_report(raw_report, request.clinical_text)
+
     latency_ms = round((time.time() - start_time) * 1000, 2)
 
     return PatientSimplifyResponse(
@@ -791,13 +798,15 @@ async def voice_amend_radiology_report(
 
     # Plain-language explanation
     manager = get_model_manager()
-    patient_report_raw, _ = manager.generate_patient_report(
+    patient_report_raw, _ = await run_in_threadpool(
+        manager.generate_patient_report,
         clinical_text=reconciled_full,
         report_type="radiology",
         clinical_indication="",
         model_name=report.model_version,
     )
     calibrated_patient_report = enforce_6th_grade_layman_report(patient_report_raw, reconciled_full)
+
 
     from inference.shared.model_manager import compute_clinical_pathologies
     pathologies = compute_clinical_pathologies(reconciled_findings, reconciled_impression)
@@ -840,7 +849,9 @@ async def get_radiology_cases(
     search: Optional[str] = Query(None, description="Search query by condition, MeSH term, or indication"),
     projection: Optional[str] = Query(None, description="Projection filter (Frontal, Lateral)"),
     source: Optional[str] = Query(None, description="Filter source: 'uploads' for user uploads only, 'all' for all"),
+    patient_id: Optional[str] = Query(None, description="Filter studies by patient ID"),
 ):
+
     """
     Generalized enterprise radiology study catalog.
     Queries the persistent database (ClinicalReport with report_type='radiology') and PACS vault uploads.
@@ -917,8 +928,26 @@ async def get_radiology_cases(
                         "windowPreset": "Lung",
                     })
 
+        # Patient-specific filtering for PACS vault uploads
+        if patient_id:
+            clean_target = patient_id.replace("UPLOAD-", "").replace("patient-", "").strip().lower()
+            uploaded_cases = [
+                c for c in uploaded_cases
+                if clean_target in c["uid"].lower()
+                or clean_target in c.get("patient_id", "").lower()
+                or clean_target in c.get("patient", "").lower()
+            ]
+
         # Query database reports directly
         query = db_sess.query(ClinicalReport).filter(ClinicalReport.report_type == "radiology")
+        if patient_id:
+            clean_pid = patient_id.replace("UPLOAD-", "").strip()
+            query = query.filter(
+                (ClinicalReport.patient_id == patient_id) |
+                (ClinicalReport.patient_id == clean_pid) |
+                (ClinicalReport.patient_id == f"UPLOAD-{clean_pid}") |
+                (ClinicalReport.patient_id.ilike(f"%{clean_pid}%"))
+            )
         if search:
             search_pattern = f"%{search}%"
             query = query.filter(
@@ -962,7 +991,13 @@ async def get_radiology_cases(
     finally:
         db_sess.close()
 
-    all_cases = uploaded_cases + db_cases
+    if source == "uploads":
+        all_cases = uploaded_cases
+    elif source == "catalog":
+        all_cases = db_cases
+    else:
+        all_cases = uploaded_cases + db_cases
+
     if search:
         s_lower = search.lower()
         all_cases = [

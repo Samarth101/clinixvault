@@ -527,6 +527,13 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
       return;
     }
 
+    if (typeof window !== 'undefined') {
+      const activeId = enc.patientId || enc.id;
+      if (activeId) {
+        localStorage.setItem('clinixvault_active_patient_id', activeId);
+      }
+    }
+
     // Attempt to restore in-flight draft from IndexedDB
     const lookupDraft = async () => {
       let draft = await getDraft('soap', enc.id);

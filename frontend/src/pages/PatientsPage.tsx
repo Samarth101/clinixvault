@@ -21,6 +21,7 @@ import {
   ChevronRight,
   Stethoscope,
   Network,
+  Scan,
 } from 'lucide-react';
 import { PageId, PatientRosterItem, PatientDetailResponse, ClinicalReportItem } from '../types';
 import { clinixApi } from '../services/api';
@@ -134,6 +135,9 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onNavigate }) => {
       });
 
       if (created) {
+        if (typeof window !== 'undefined' && created.id) {
+          localStorage.setItem('clinixvault_active_patient_id', created.id);
+        }
         await fetchRoster();
         setIsNewPatientModalOpen(false);
         setNewPatientForm({
@@ -437,7 +441,12 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onNavigate }) => {
                 <div className="pt-4 mt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5">
                     <button
-                      onClick={() => onNavigate('overview')}
+                      onClick={() => {
+                        if (typeof window !== 'undefined') {
+                          localStorage.setItem('clinixvault_active_patient_id', patient.id);
+                        }
+                        onNavigate('overview');
+                      }}
                       className="px-2.5 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 text-clinical-blue dark:text-sky-300 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
                       title="Open Ambient Scribe Workstation"
                     >
@@ -445,7 +454,25 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onNavigate }) => {
                       <span>Scribe</span>
                     </button>
                     <button
-                      onClick={() => onNavigate('graph')}
+                      onClick={() => {
+                        if (typeof window !== 'undefined') {
+                          localStorage.setItem('clinixvault_active_patient_id', patient.id);
+                        }
+                        onNavigate('radiology');
+                      }}
+                      className="px-2.5 py-1.5 rounded-lg bg-sky-50 dark:bg-sky-950/60 hover:bg-sky-100 text-sky-700 dark:text-sky-300 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                      title="Open Radiology Studio for Patient"
+                    >
+                      <Scan className="w-3.5 h-3.5" />
+                      <span>X-Ray</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (typeof window !== 'undefined') {
+                          localStorage.setItem('clinixvault_active_patient_id', patient.id);
+                        }
+                        onNavigate('graph');
+                      }}
                       className="px-2.5 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 text-indigo-600 dark:text-indigo-300 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
                       title="Inspect Neo4j Knowledge Graph"
                     >
@@ -453,7 +480,12 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onNavigate }) => {
                       <span>Graph</span>
                     </button>
                     <button
-                      onClick={() => openPatientDetail(patient.id)}
+                      onClick={() => {
+                        if (typeof window !== 'undefined') {
+                          localStorage.setItem('clinixvault_active_patient_id', patient.id);
+                        }
+                        openPatientDetail(patient.id);
+                      }}
                       className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 text-xs font-bold transition-all cursor-pointer"
                     >
                       Details

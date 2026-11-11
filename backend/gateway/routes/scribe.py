@@ -15,6 +15,7 @@ import httpx
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, HTTPException, status
+from starlette.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
 from backend.database.connection import SessionLocal
@@ -265,7 +266,7 @@ async def scribe_websocket_stream(websocket: WebSocket):
                         logger.warning(f"Downstream LLM call error: {e}. Using local LLM runner.")
                         from inference.llm_server.model_loader import get_llm_runner
                         runner = get_llm_runner()
-                        local_soap = runner.generate_soap_note(full_dialogue)
+                        local_soap = await run_in_threadpool(runner.generate_soap_note, full_dialogue)
                         soap_res = {
                             "soap_note": local_soap,
                             "formatted_markdown": f"### S\n{local_soap.get('subjective')}\n### O\n{local_soap.get('objective')}\n### A\n{local_soap.get('assessment')}\n### P\n{local_soap.get('plan')}",
@@ -505,7 +506,7 @@ async def synthesize_soap_from_dialogue(request: SoapSynthesisRequest):
     if not soap_res:
         from inference.llm_server.model_loader import get_llm_runner
         runner = get_llm_runner()
-        local_soap = runner.generate_soap_note(dialogue)
+        local_soap = await run_in_threadpool(runner.generate_soap_note, dialogue)
         soap_res = {
             "soap_note": local_soap,
             "formatted_markdown": f"### S\n{local_soap.get('subjective')}\n### O\n{local_soap.get('objective')}\n### A\n{local_soap.get('assessment')}\n### P\n{local_soap.get('plan')}",

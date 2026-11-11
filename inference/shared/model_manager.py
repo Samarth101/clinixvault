@@ -1115,7 +1115,18 @@ class ModelManager:
         """
         target_model = model_name or self.active_summarize_model
 
-        # Optional edge service if explicitly configured in environment (no hardcoded remote IPs)
+        # Guard against gibberish, keystroke spam, or insufficient input
+        from inference.shared.clinical_sufficiency import is_clinically_sufficient
+        sufficient, reason = is_clinically_sufficient(clinical_text)
+        if not sufficient:
+            logger.warning(f"Clinical summarization skipped due to insufficient input: {reason}")
+            return (
+                "Insufficient clinical documentation provided. Please enter clinical observations, patient notes, or vitals to generate a summary.",
+                ["No verifiable clinical findings detected in source document."],
+                ["Provide legible clinical documentation or consultation notes."],
+                target_model,
+            )
+
         edge_url = getattr(settings, "SUMMARIZER_EDGE_URL", "")
         if edge_url and target_model and ("qwen2.5" in target_model.lower() or "clinixvault" in target_model.lower()):
             try:
@@ -1291,7 +1302,25 @@ class ModelManager:
         """
         target_model = model_name or self.active_summarize_model
 
-        # Optional edge service if explicitly configured in environment (no hardcoded remote IPs)
+        # Guard against gibberish, keystroke spam, or insufficient input
+        from inference.shared.clinical_sufficiency import is_clinically_sufficient
+        sufficient, reason = is_clinically_sufficient(clinical_text)
+        if not sufficient:
+            logger.warning(f"Patient AVS generation skipped due to insufficient input: {reason}")
+            insufficient_report = {
+                "headline": "No clinical information available to summarize.",
+                "what_was_examined": "Clinical Documentation",
+                "doctor_explanation": "The text entered does not contain recognizable clinical or medical records. Please provide a physician note, visit summary, or lab report so we can generate your care plan.",
+                "key_findings": ["No medical data or symptoms found in the input document."],
+                "what_it_means": "No medical diagnosis or care plan could be established because no health information was submitted.",
+                "next_steps": ["Enter or upload your medical notes, consultation record, or discharge instructions."],
+                "jargon_translations": [],
+                "questions_for_doctor": ["Can I provide my clinical note or visit report?"],
+                "reading_level": "Grade 6 (Plain Language)",
+                "is_insufficient": True,
+            }
+            return insufficient_report, target_model
+
         edge_url = getattr(settings, "SUMMARIZER_EDGE_URL", "")
         if edge_url and target_model and ("qwen2.5" in target_model.lower() or "clinixvault" in target_model.lower()):
             try:

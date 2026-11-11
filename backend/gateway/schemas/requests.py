@@ -120,6 +120,7 @@ class GatewaySummarizeRequest(BaseModel):
 class GatewaySummarizeResponse(BaseModel):
     summary_id: str
     summary: str
+    keyFindings: Optional[List[str]] = None
     key_findings: List[str]
     action_items: List[str]
     citations: List[Dict[str, Any]] = Field(default_factory=list)
@@ -128,6 +129,8 @@ class GatewaySummarizeResponse(BaseModel):
     patient_report: Optional[Dict[str, Any]] = None
     graph_factuality_score: Optional[float] = None
     graph_verified_triples: Optional[List[str]] = Field(default_factory=list)
+    status: str = "success"
+    is_insufficient: bool = False
 
 
 class PatientSimplifyRequest(BaseModel):
@@ -142,6 +145,8 @@ class PatientSimplifyResponse(BaseModel):
     patient_report: Dict[str, Any]
     latency_ms: float
     model_version: Optional[str] = None
+    is_insufficient: Optional[bool] = False
+
 
 
 class GatewayDocumentSummarizeRequest(BaseModel):
@@ -168,6 +173,10 @@ class GatewayDocumentSummarizeResponse(BaseModel):
     pages_processed: int = 1
     latency_ms: float
     model_version: Optional[str] = None
+    status: Optional[str] = "success"
+    is_insufficient: Optional[bool] = False
+    patient_report: Optional[Dict[str, Any]] = None
+
 
 
 class AmbientScribeInit(BaseModel):

@@ -213,7 +213,9 @@ export interface PatientReport {
   jargon_translations: JargonTranslation[];
   questions_for_doctor: string[];
   reading_level?: string;
+  is_insufficient?: boolean;
 }
+
 
 export type HighlightCategory = 'pathology' | 'anatomy' | 'normal' | 'code' | 'acuity';
 

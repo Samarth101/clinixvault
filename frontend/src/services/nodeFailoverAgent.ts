@@ -50,7 +50,8 @@ const DEFAULT_LOCAL_URL = 'http://127.0.0.1:8000';
 const LATENCY_FAILOVER_THRESHOLD_MS = 1200;
 const CONSECUTIVE_FAILURE_THRESHOLD = 3;
 const HEARTBEAT_INTERVAL_MS = 2500;
-const PROBE_TIMEOUT_MS = 1500;
+const PROBE_TIMEOUT_MS = 3500;
+
 
 class NodeFailoverAgent {
   private colabUrl: string = DEFAULT_COLAB_URL;
@@ -192,7 +193,7 @@ class NodeFailoverAgent {
    */
   private async probeEndpoint(
     url: string
-  ): Promise<{ ok: boolean; latencyMs: number; error?: string }> {
+  ): Promise<{ ok: boolean; latencyMs: number; error?: string; isTimeout?: boolean }> {
     const t0 = performance.now();
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
@@ -212,8 +213,9 @@ class NodeFailoverAgent {
     } catch (err: any) {
       clearTimeout(timeout);
       const latencyMs = Math.round(performance.now() - t0);
-      const msg = err?.name === 'AbortError' ? 'Heartbeat timed out (>1500ms)' : (err?.message || 'Network error');
-      return { ok: false, latencyMs, error: msg };
+      const isTimeout = err?.name === 'AbortError' || err?.message?.includes('aborted');
+      const msg = isTimeout ? `Heartbeat timed out (>${PROBE_TIMEOUT_MS}ms)` : (err?.message || 'Network error');
+      return { ok: false, latencyMs, error: msg, isTimeout };
     }
   }
 
@@ -296,7 +298,8 @@ class NodeFailoverAgent {
     }
 
     // If active node is completely offline
-    if (!result.ok && this.consecutiveFailures >= 2) {
+    const failureThreshold = (result.isTimeout && !isColabActive) ? 4 : CONSECUTIVE_FAILURE_THRESHOLD;
+    if (!result.ok && this.consecutiveFailures >= failureThreshold) {
       // Check if secondary node is alive
       const altUrl = isColabActive ? this.localUrl : this.colabUrl;
       const altResult = await this.probeEndpoint(altUrl);

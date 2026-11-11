@@ -37,6 +37,7 @@ import {
   AlertTriangle,
   Sliders,
   Mic,
+  X,
 } from 'lucide-react';
 import { StreamingText } from '../components/StreamingText';
 import { MedicalKeywordHighlighter } from '../components/MedicalKeywordHighlighter';
@@ -49,6 +50,7 @@ import { saveDraft, getDraft, queuePendingAction } from '../services/indexedDbCa
 interface RadiologyStudioPageProps {
   onOpenModelManager?: () => void;
   onNavigate?: (page: any) => void;
+  patientId?: string;
 }
 
 interface RadiologyCase {
@@ -87,6 +89,7 @@ interface RadiologyCase {
   cacheHit?: boolean;
   reportId?: string;
 }
+
 
 // Helper to derive dynamically calibrated diagnostic pathologies from text findings
 const derivePathologies = (
@@ -524,17 +527,22 @@ const renderScoordOverlay = (box: ScoordBox, score?: number, isPinned?: boolean)
   );
 };
 
-export const RadiologyStudioPage: React.FC<RadiologyStudioPageProps> = ({ onOpenModelManager: _onOpenModelManager, onNavigate }) => {
+export const RadiologyStudioPage: React.FC<RadiologyStudioPageProps> = ({ onOpenModelManager: _onOpenModelManager, onNavigate, patientId }) => {
+  const activePatientId = patientId || (typeof window !== 'undefined' ? localStorage.getItem('clinixvault_active_patient_id') : null);
+  const storageKey = activePatientId ? `clinixvault_last_radiology_study_${activePatientId}` : 'clinixvault_last_radiology_study';
+
   const [selectedCase, setSelectedCase] = useState<RadiologyCase>(() => {
     try {
-      const saved = localStorage.getItem('clinixvault_last_radiology_study');
+      const saved = localStorage.getItem(storageKey);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && parsed.id && parsed.id !== 'EMPTY' && !parsed.id.startsWith('STUDY-') && (parsed.id.startsWith('UPLOAD-') || parsed.id.startsWith('patient-') || parsed.isDicomFile || (parsed.customImageUrl && (parsed.customImageUrl.startsWith('data:') || parsed.customImageUrl.startsWith('blob:'))))) {
-          return parsed;
-        } else {
-          localStorage.removeItem('clinixvault_last_radiology_study');
+          // If a patient is active, verify this study actually matches the active patient
+          if (!activePatientId || parsed.id.includes(activePatientId) || (parsed.patient && parsed.patient.includes(activePatientId))) {
+            return parsed;
+          }
         }
+        localStorage.removeItem(storageKey);
       }
     } catch {}
     return EMPTY_CASE;
@@ -542,16 +550,19 @@ export const RadiologyStudioPage: React.FC<RadiologyStudioPageProps> = ({ onOpen
 
   const [casesList, setCasesList] = useState<RadiologyCase[]>(() => {
     try {
-      const saved = localStorage.getItem('clinixvault_last_radiology_study');
+      const saved = localStorage.getItem(storageKey);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && parsed.id && parsed.id !== 'EMPTY' && !parsed.id.startsWith('STUDY-') && (parsed.id.startsWith('UPLOAD-') || parsed.id.startsWith('patient-') || parsed.isDicomFile || (parsed.customImageUrl && (parsed.customImageUrl.startsWith('data:') || parsed.customImageUrl.startsWith('blob:'))))) {
-          return [parsed];
+          if (!activePatientId || parsed.id.includes(activePatientId) || (parsed.patient && parsed.patient.includes(activePatientId))) {
+            return [parsed];
+          }
         }
       }
     } catch {}
     return [];
   });
+
   const [windowPreset, setWindowPreset] = useState<'Lung' | 'Bone' | 'SoftTissue' | 'Inverted'>('Lung');
   const [zoomLevel, setZoomLevel] = useState(1);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -583,6 +594,17 @@ export const RadiologyStudioPage: React.FC<RadiologyStudioPageProps> = ({ onOpen
   const [voiceTargetCompartment, setVoiceTargetCompartment] = useState<string>('lungs_pleura');
   const [isAmendingVoice, setIsAmendingVoice] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleClearCase = (caseIdToClear?: string) => {
+    const targetId = caseIdToClear || selectedCase.id;
+    setCasesList((prev) => prev.filter((c) => c.id !== targetId));
+    if (selectedCase.id === targetId || !targetId) {
+      setSelectedCase(EMPTY_CASE);
+      try {
+        localStorage.removeItem(storageKey);
+      } catch {}
+    }
+  };
 
   const handleVoiceAmend = async () => {
     if (!voiceInputText.trim() || !selectedCase.reportId) {
@@ -753,8 +775,15 @@ export const RadiologyStudioPage: React.FC<RadiologyStudioPageProps> = ({ onOpen
   const loadDynamicCases = async (query = '', proj = 'all') => {
     setIsSearchingCases(true);
     try {
-      const res = await clinixApi.getRadiologyCases(1, 20, query, proj);
-      if (res && res.cases && res.cases.length > 0) {
+      const res = await clinixApi.getRadiologyCases(
+        1,
+        20,
+        query,
+        proj,
+        activePatientId ? 'all' : (query ? 'all' : 'uploads'),
+        activePatientId || undefined
+      );
+      if (res && res.cases) {
         const mappedCases: RadiologyCase[] = res.cases.map((c) => {
           const studyId = c.study_uid
             ? (c.id?.startsWith('STUDY-') ? c.id : `STUDY-${c.study_uid}`)
@@ -811,22 +840,33 @@ export const RadiologyStudioPage: React.FC<RadiologyStudioPageProps> = ({ onOpen
         });
 
         setCasesList((prev) => {
-          // Strictly retain authentic user-uploaded cases only in the workstation carousel
+          if (activePatientId) {
+            // Strictly retain authentic cases belonging to active patient
+            const userUploads = prev.filter(c => (c.id.startsWith('UPLOAD-') || c.id.startsWith('patient-')) && c.patient.includes(activePatientId));
+            const uploadIds = new Set(userUploads.map(c => c.id));
+            const patientCases = mappedCases.filter(c => !uploadIds.has(c.id));
+            return [...userUploads, ...patientCases];
+          }
           const userUploads = prev.filter(c => c.id.startsWith('UPLOAD-') || c.id.startsWith('patient-') || (c.customImageUrl && (c.customImageUrl.startsWith('data:') || c.customImageUrl.startsWith('blob:'))));
           const uploadIds = new Set(userUploads.map(c => c.id));
-          const genuineUploads = mappedCases.filter(c => (c.id.startsWith('UPLOAD-') || c.id.startsWith('patient-')) && !uploadIds.has(c.id));
+          const genuineUploads = mappedCases.filter(c => !uploadIds.has(c.id));
           return [...userUploads, ...genuineUploads];
         });
 
         setSelectedCase((prev) => {
-          if (prev && (prev.id.startsWith('UPLOAD-') || prev.id.startsWith('patient-') || (prev.customImageUrl && (prev.customImageUrl.startsWith('data:') || prev.customImageUrl.startsWith('blob:'))))) {
-            return prev;
+          if (prev && prev.id && prev.id !== 'EMPTY') {
+            if (!activePatientId || prev.id.includes(activePatientId) || (prev.patient && prev.patient.includes(activePatientId))) {
+              return prev;
+            }
           }
-          const validUpload = mappedCases.find(c => c.id.startsWith('UPLOAD-') || c.id.startsWith('patient-'));
-          return validUpload || EMPTY_CASE;
+          if (activePatientId) {
+            return mappedCases.length > 0 ? mappedCases[0] : EMPTY_CASE;
+          }
+          return EMPTY_CASE;
         });
         setActiveProjectionIdx(0);
       }
+
     } catch (e) {
       console.warn("Failed to load diagnostic PACS cases", e);
     } finally {
@@ -951,11 +991,11 @@ export const RadiologyStudioPage: React.FC<RadiologyStudioPageProps> = ({ onOpen
       reader.onload = async () => {
         const dataUrl = reader.result as string;
         const base64Data = dataUrl.split(',')[1] || dataUrl;
-        const newStudyId = uploadedCase?.id || `UPLOAD-RAD-${Date.now().toString().slice(-4)}`;
+        const newStudyId = uploadedCase?.id || (activePatientId ? `UPLOAD-${activePatientId}-RAD-${Date.now().toString().slice(-4)}` : `UPLOAD-RAD-${Date.now().toString().slice(-4)}`);
 
         const newCase: RadiologyCase = {
           id: newStudyId,
-          patient: (uploadedCase as any)?.patient || (uploadedCase as any)?.patient_id || `Patient #${patientId} (Uploaded)`,
+          patient: (uploadedCase as any)?.patient || (uploadedCase as any)?.patient_id || (activePatientId ? `Patient #${activePatientId} (Uploaded)` : `Patient #${newStudyId} (Uploaded)`),
           view: file.name.endsWith('.dcm') ? "Direct DICOM 16-bit Matrix" : "Imported Chest Radiograph PA",
           indication: "Stat diagnostic interpretation requested for uploaded study.",
           customImageUrl: dataUrl,
@@ -978,7 +1018,7 @@ export const RadiologyStudioPage: React.FC<RadiologyStudioPageProps> = ({ onOpen
         };
 
         try {
-          localStorage.setItem('clinixvault_last_radiology_study', JSON.stringify(newCase));
+          localStorage.setItem(storageKey, JSON.stringify(newCase));
         } catch {}
 
         setCasesList((prev) => [newCase, ...prev.filter(c => c.id !== newStudyId)]);
@@ -1034,7 +1074,7 @@ export const RadiologyStudioPage: React.FC<RadiologyStudioPageProps> = ({ onOpen
             };
 
             try {
-              localStorage.setItem('clinixvault_last_radiology_study', JSON.stringify(updatedStudy));
+              localStorage.setItem(storageKey, JSON.stringify(updatedStudy));
             } catch {}
 
             setSelectedCase(updatedStudy);
@@ -1144,7 +1184,7 @@ export const RadiologyStudioPage: React.FC<RadiologyStudioPageProps> = ({ onOpen
         };
 
         try {
-          localStorage.setItem('clinixvault_last_radiology_study', JSON.stringify(updatedStudy));
+          localStorage.setItem(storageKey, JSON.stringify(updatedStudy));
           void saveDraft('radiology', selectedCase.id, selectedCase.patient, {
             findings: updatedStudy.findings,
             impression: updatedStudy.impression,
@@ -1426,28 +1466,38 @@ export const RadiologyStudioPage: React.FC<RadiologyStudioPageProps> = ({ onOpen
             casesList.slice(0, 15).map((c) => {
               const isSelected = selectedCase.id === c.id;
               return (
-                <motion.button
-                  key={c.id}
-                  onClick={() => {
-                    setSelectedCase(c);
-                    setActiveProjectionIdx(0);
-                    setIsGenerating(false);
-                    try {
-                      localStorage.setItem('clinixvault_last_radiology_study', JSON.stringify(c));
-                    } catch {}
-                  }}
-                  whileHover={{ y: -1 }}
-                  whileTap={{ scale: 0.98 }}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer shrink-0 border ${
-                    isSelected
-                      ? 'bg-slate-900 dark:bg-clinical-blue text-white border-transparent shadow-md'
-                      : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 border-slate-200 dark:border-slate-700'
-                  }`}
-                >
-                  <div className="flex items-center gap-1.5">
+                <div key={c.id} className="relative group shrink-0 flex items-center">
+                  <motion.button
+                    onClick={() => {
+                      setSelectedCase(c);
+                      setActiveProjectionIdx(0);
+                      setIsGenerating(false);
+                      try {
+                        localStorage.setItem(storageKey, JSON.stringify(c));
+                      } catch {}
+                    }}
+                    whileHover={{ y: -1 }}
+                    whileTap={{ scale: 0.98 }}
+                    className={`px-3 py-1.5 pr-6 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer border flex items-center gap-1.5 ${
+                      isSelected
+                        ? 'bg-slate-900 dark:bg-clinical-blue text-white border-transparent shadow-md'
+                        : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 border-slate-200 dark:border-slate-700'
+                    }`}
+                  >
                     <span>{c.id}</span>
-                  </div>
-                </motion.button>
+                  </motion.button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleClearCase(c.id);
+                    }}
+                    title="Dismiss Study Tab"
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-rose-500 p-0.5 rounded cursor-pointer transition-colors"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
               );
             })
           )}
@@ -1472,6 +1522,18 @@ export const RadiologyStudioPage: React.FC<RadiologyStudioPageProps> = ({ onOpen
               <span className="text-xs text-slate-500 font-medium truncate max-w-[150px]">
                 {selectedCase.view}
               </span>
+
+              {selectedCase.id && selectedCase.id !== 'EMPTY' && (
+                <button
+                  type="button"
+                  onClick={() => handleClearCase(selectedCase.id)}
+                  className="px-2 py-0.5 text-[10px] font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 hover:text-rose-600 text-slate-500 border border-slate-200 dark:border-slate-700 hover:border-rose-300"
+                  title="Clear study from workstation viewport"
+                >
+                  <X className="w-3 h-3" />
+                  <span>Clear</span>
+                </button>
+              )}
 
               {/* Multi-Projection View Switcher (PA Frontal vs Lateral) */}
               {selectedCase.projections && selectedCase.projections.length > 1 && (
@@ -2492,10 +2554,12 @@ export const RadiologyStudioPage: React.FC<RadiologyStudioPageProps> = ({ onOpen
                         VLM Diagnostic Synthesis Active
                         <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
                       </span>
-                      <p className="text-[11px] text-slate-500 font-mono mt-0.5">Air-Gapped Local Inference • Zero Cloud Egress</p>
+                      <p className="text-[11px] text-slate-500 font-mono mt-0.5">Air-Gapped MPS Inference • Stage 1 & 2 Neural Synthesis (~30-65s) • Zero Cloud Egress</p>
                     </div>
                   </div>
-                  <span className="font-mono text-[11px] font-black bg-blue-100 text-blue-800 px-2.5 py-1 rounded-lg">64.8 tok/s</span>
+                  <span className="font-mono text-[11px] font-black bg-blue-100 text-blue-800 px-2.5 py-1 rounded-lg">
+                    {elapsedMs > 0 ? `${(elapsedMs / 1000).toFixed(1)}s elapsed` : '64.8 tok/s'}
+                  </span>
                 </div>
               )}
 

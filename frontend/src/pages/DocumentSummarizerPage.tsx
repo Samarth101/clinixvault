@@ -58,13 +58,14 @@ export const DocumentSummarizerPage: React.FC = () => {
     latencyMs: number;
     modelVersion: string;
     patientReport?: PatientReport;
+    isInsufficient?: boolean;
   } | null>(null);
 
   const [copied, setCopied] = useState(false);
 
   // Run summarization
   const handleGenerateSummary = async () => {
-    if (!inputText.trim()) return;
+    if (!inputText.trim() || inputText.trim().length < 4) return;
     setIsProcessing(true);
     try {
       const res = await clinixApi.summarizeDocument(
@@ -75,15 +76,17 @@ export const DocumentSummarizerPage: React.FC = () => {
         selectedModel
       );
 
-      // If patient mode, generate plain language AVS
-      let patientRep: PatientReport | undefined = undefined;
-      try {
-        const pRes = await clinixApi.simplifyClinicalNote(res.summary || inputText, 'discharge', selectedModel);
-        if (pRes) {
-          patientRep = pRes;
+      // If patient mode or report available, resolve plain language AVS
+      let patientRep: PatientReport | undefined = res.patientReport;
+      if (!patientRep && !res.isInsufficient) {
+        try {
+          const pRes = await clinixApi.simplifyClinicalNote(res.summary || inputText, 'discharge', selectedModel);
+          if (pRes) {
+            patientRep = pRes;
+          }
+        } catch (pErr) {
+          console.warn('Patient report simplification fallback:', pErr);
         }
-      } catch (pErr) {
-        console.warn('Patient report simplification fallback:', pErr);
       }
 
       setSummaryData({
@@ -98,6 +101,7 @@ export const DocumentSummarizerPage: React.FC = () => {
         latencyMs: res.latencyMs,
         modelVersion: res.modelVersion,
         patientReport: patientRep,
+        isInsufficient: Boolean(res.isInsufficient || patientRep?.is_insufficient),
       });
     } catch (err) {
       console.error('Summarization failed:', err);
@@ -105,6 +109,7 @@ export const DocumentSummarizerPage: React.FC = () => {
       setIsProcessing(false);
     }
   };
+
 
   // Copy structured summary
   const handleCopy = () => {
@@ -234,9 +239,10 @@ export const DocumentSummarizerPage: React.FC = () => {
 
               <button
                 onClick={handleGenerateSummary}
-                disabled={isProcessing || !inputText.trim()}
+                disabled={isProcessing || !inputText.trim() || inputText.trim().length < 4}
                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold text-xs shadow-md shadow-blue-500/20 disabled:opacity-50 transition-all cursor-pointer"
               >
+
                 {isProcessing ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
@@ -273,7 +279,7 @@ export const DocumentSummarizerPage: React.FC = () => {
               </div>
 
               {/* View Tabs */}
-              {summaryData && audienceMode === 'clinician' && (
+              {summaryData && !summaryData.isInsufficient && audienceMode === 'clinician' && (
                 <div className="flex items-center gap-1 text-[11px] font-medium bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
                   <button
                     onClick={() => setActiveTab('summary')}
@@ -303,7 +309,7 @@ export const DocumentSummarizerPage: React.FC = () => {
               )}
 
               {/* Copy / Action buttons */}
-              {summaryData && (
+              {summaryData && !summaryData.isInsufficient && (
                 <div className="flex items-center gap-1.5">
                   <button
                     onClick={handleCopy}
@@ -357,32 +363,83 @@ export const DocumentSummarizerPage: React.FC = () => {
                 </div>
               )}
 
+              {/* Insufficient Clinical Data Alert Banner */}
+              {summaryData && summaryData.isInsufficient && (
+                <div className="p-4 mb-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 flex items-start gap-3 text-xs">
+                  <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="font-bold text-amber-900 dark:text-amber-200">
+                      Insufficient Clinical Documentation
+                    </h4>
+                    <p className="text-amber-800 dark:text-amber-300 mt-0.5 leading-relaxed">
+                      The input text did not contain recognizable clinical findings, vitals, or symptoms. Please input valid physician notes, SOAP documentation, or upload a medical document to generate a clinical synthesis.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Patient Mode View */}
               {summaryData && audienceMode === 'patient' && (
-                <div className="space-y-4">
-                  {summaryData.patientReport ? (
-                    <PatientReportView
-                      report={summaryData.patientReport}
-                      patientName="Active Sovereign Patient"
-                      studyTitle="Clinical After-Visit Summary (AVS)"
-                      doctorName="ClinixVault Attending Staff"
-                    />
-                  ) : (
-                    <div className="bg-emerald-50 dark:bg-emerald-950/20 p-5 rounded-2xl border border-emerald-200 dark:border-emerald-800/60">
-                      <h4 className="text-sm font-bold text-emerald-800 dark:text-emerald-300 mb-2">
-                        Plain-Language Summary for You and Your Family
-                      </h4>
-                      <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-line">
-                        {summaryData.summary}
+                summaryData.isInsufficient ? (
+                  <div className="p-8 rounded-3xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-800/80 text-center space-y-4">
+                    <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                      <FileText className="w-7 h-7" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">
+                        No Medical Information Detected
+                      </h3>
+                      <p className="text-xs text-slate-600 dark:text-slate-300 max-w-md mx-auto mt-2 leading-relaxed">
+                        We couldn't find recognizable clinical observations, symptoms, or doctor's notes in the submitted text. To generate your personalized take-home health summary, please enter or upload consultation notes, discharge records, or lab reports.
                       </p>
                     </div>
-                  )}
-                </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {summaryData.patientReport ? (
+                      <PatientReportView
+                        report={summaryData.patientReport}
+                        patientName="Active Sovereign Patient"
+                        studyTitle="Clinical After-Visit Summary (AVS)"
+                        doctorName="ClinixVault Attending Staff"
+                      />
+                    ) : (
+                      <div className="bg-emerald-50 dark:bg-emerald-950/20 p-5 rounded-2xl border border-emerald-200 dark:border-emerald-800/60">
+                        <h4 className="text-sm font-bold text-emerald-800 dark:text-emerald-300 mb-2">
+                          Plain-Language Summary for You and Your Family
+                        </h4>
+                        <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-line">
+                          {summaryData.summary}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )
               )}
 
               {/* Doctor Mode View */}
               {summaryData && audienceMode === 'clinician' && (
-                <>
+                summaryData.isInsufficient ? (
+                  <div className="p-6 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs space-y-3">
+                    <h4 className="font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-slate-400" />
+                      Clinical Input Sufficiency Notice
+                    </h4>
+                    <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
+                      {summaryData.summary}
+                    </p>
+                    <div className="pt-2 border-t border-slate-200 dark:border-slate-800">
+                      <span className="font-semibold text-slate-700 dark:text-slate-300 block mb-1.5">Required Clinical Documentation:</span>
+                      <ul className="list-disc pl-5 space-y-1 text-slate-600 dark:text-slate-400">
+                        <li>History of Present Illness (HPI) or chief complaint</li>
+                        <li>Physical examination findings or vital signs (BP, HR, SpO2, Temp)</li>
+                        <li>Diagnostic laboratory observations or imaging impressions</li>
+                        <li>Physician consultation notes or discharge instructions</li>
+                      </ul>
+                    </div>
+                  </div>
+                ) : (
+                  <>
                   {activeTab === 'summary' && (
                     <div className="space-y-4 text-xs">
                       {/* Metric Banner */}
@@ -527,6 +584,7 @@ export const DocumentSummarizerPage: React.FC = () => {
                     </div>
                   )}
                 </>
+                )
               )}
             </div>
           </div>

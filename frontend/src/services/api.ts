@@ -597,6 +597,9 @@ export const clinixApi = {
     pagesProcessed: number;
     latencyMs: number;
     modelVersion: string;
+    status?: string;
+    isInsufficient?: boolean;
+    patientReport?: PatientReport;
   }> {
     const startTime = performance.now();
     try {
@@ -631,8 +634,12 @@ export const clinixApi = {
           pagesProcessed: data.pages_processed ?? 1,
           latencyMs: data.latency_ms ?? Math.round(performance.now() - startTime),
           modelVersion: data.model_version || modelName || 'Clinical-Summarizer',
+          status: data.status || 'success',
+          isInsufficient: Boolean(data.is_insufficient),
+          patientReport: data.patient_report,
         };
       }
+
       throw new Error(`Document summarizer returned HTTP ${resp.status}`);
     } catch (err: any) {
       throw new Error(`Document summarizer error: ${err?.message || 'Summarization engine is offline or unreachable'}`);
@@ -764,7 +771,7 @@ export const clinixApi = {
     const startTime = performance.now();
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2000);
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
 
       const resp = await fetch(`${getApiBaseUrl()}/api/v1/health`, {
         method: 'GET',
@@ -818,7 +825,8 @@ export const clinixApi = {
     const startTime = performance.now();
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 45000);
+      const timeoutId = setTimeout(() => controller.abort(), 180000);
+
 
       const resp = await fetch(`${getApiBaseUrl()}/api/v1/radiology/generate`, {
         method: 'POST',
@@ -907,9 +915,10 @@ export const clinixApi = {
       let errorCategory: 'backend_offline' | 'model_unavailable' | 'timeout' | 'inference_failure' = 'inference_failure';
 
       if (isTimeout) {
-        errorMessage = 'Inference request timed out after 30 seconds. The target vision model may be overloaded or initializing.';
+        errorMessage = 'Inference request timed out after 180 seconds. The target vision model may be overloaded or initializing.';
         errorCategory = 'timeout';
       } else if (isConnectionRefused) {
+
         errorMessage = 'ClinixVault Backend Gateway is offline or unreachable at port 8000. Verify the gateway service is running.';
         errorCategory = 'backend_offline';
       }
@@ -1055,7 +1064,8 @@ export const clinixApi = {
     limit = 20,
     search = '',
     projection = '',
-    source = 'uploads'
+    source = 'all',
+    patientId?: string
   ): Promise<RadiologyCasesResponse> {
     try {
       const params = new URLSearchParams({
@@ -1069,11 +1079,13 @@ export const clinixApi = {
         params.append('source', source);
       }
       if (projection && projection !== 'all') params.append('projection', projection);
+      if (patientId) params.append('patient_id', patientId);
 
       const resp = await fetch(`${getApiBaseUrl()}/api/v1/radiology/cases?${params.toString()}`);
       if (resp.ok) {
         return await resp.json();
       }
+
     } catch {
       // fallback
     }
@@ -1107,12 +1119,17 @@ export const clinixApi = {
     file: File,
     patientName?: string,
     indication?: string,
-    projection = 'Frontal'
+    projection = 'Frontal',
+    patientId?: string
   ): Promise<RadiologyCase> {
     const formData = new FormData();
     formData.append('file', file);
+    if (patientId) formData.append('patient_id', patientId);
     if (patientName) formData.append('patient_name', patientName);
-    if (indication) formData.append('indication', indication);
+    if (indication) {
+      formData.append('indication', indication);
+      formData.append('clinical_indication', indication);
+    }
     formData.append('projection', projection);
 
     const resp = await fetch(`${getApiBaseUrl()}/api/v1/radiology/upload`, {

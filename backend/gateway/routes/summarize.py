@@ -11,7 +11,10 @@ import httpx
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status
+from starlette.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
+from inference.shared.clinical_sufficiency import is_clinically_sufficient
+
 
 from backend.database.connection import get_db
 from backend.database.models import ClinicalReport, Patient
@@ -178,6 +181,37 @@ async def summarize_clinical_text(
     action_items = []
     model_version = request.model_name or "ClinixVault-Mistral-7B-Summarizer"
 
+    # Pre-inference sufficiency check: reject gibberish, keystroke noise, or non-clinical text
+    sufficient, reason = is_clinically_sufficient(request.clinical_text)
+    if not sufficient:
+        latency_ms = round((time.time() - start_time) * 1000, 2)
+        insufficient_report = {
+            "headline": "No clinical information available to summarize.",
+            "what_was_examined": "Clinical Documentation",
+            "doctor_explanation": "The text entered does not contain recognizable clinical or medical records. Please provide a physician note, visit summary, or lab report so we can generate your care plan.",
+            "key_findings": ["No medical data or clinical symptoms detected in the input document."],
+            "what_it_means": "No diagnosis or care plan could be formulated because no health information was submitted.",
+            "next_steps": ["Enter or upload your medical notes, consultation record, or discharge instructions."],
+            "jargon_translations": [],
+            "questions_for_doctor": ["Can I provide my clinical note or visit report?"],
+            "reading_level": "Grade 6 (Plain Language)",
+            "is_insufficient": True,
+        }
+        return GatewaySummarizeResponse(
+            summary_id=f"SUM-WARN-{uuid.uuid4().hex[:8].upper()}",
+            summary="Insufficient clinical documentation provided. Clinical observations, patient notes, or vitals are required to formulate a summary.",
+            key_findings=["No verifiable clinical observations or symptoms detected in the provided source document."],
+            action_items=["Input comprehensive physician notes, SOAP documentation, or upload a readable clinical scan."],
+            citations=[],
+            latency_ms=latency_ms,
+            model_version=model_version,
+            patient_report=insufficient_report,
+            graph_factuality_score=0.0,
+            graph_verified_triples=[],
+            status="insufficient_input",
+            is_insufficient=True,
+        )
+
     # 0. Retrieve GraphRAG Ground-Truth Context from Neo4j / In-Memory Knowledge Graph
     graph_context = ""
     try:
@@ -241,11 +275,13 @@ async def summarize_clinical_text(
     # 2. Local Model Manager (Ollama / Local C++ GGUF / Synthesis Engine)
     if not service_contacted:
         manager = get_model_manager()
-        summary_text, key_findings, action_items, model_version = manager.generate_clinical_summary(
+        summary_text, key_findings, action_items, model_version = await run_in_threadpool(
+            manager.generate_clinical_summary,
             clinical_text=augmented_clinical_text,
             summary_type=request.summary_type,
             model_name=request.model_name,
         )
+
 
     # Dynamic sanitization: ensure no hardcoded boilerplate action items surface
     hardcoded_checks = ["correlate with clinical symptomatology", "follow-up with attending physician as indicated", "schedule outpatient specialty follow-up"]
@@ -318,12 +354,14 @@ async def summarize_clinical_text(
 
     # Generate Plain-Language Lay Audience Patient Explanation
     manager = get_model_manager()
-    patient_report, _ = manager.generate_patient_report(
+    patient_report, _ = await run_in_threadpool(
+        manager.generate_patient_report,
         clinical_text=summary_text,
         report_type=request.summary_type,
         clinical_indication="",
         model_name=request.model_name,
     )
+
 
     latency_ms = round((time.time() - start_time) * 1000, 2)
 
@@ -384,7 +422,8 @@ async def simplify_clinical_summary_for_patient(
     """
     start_time = time.time()
     manager = get_model_manager()
-    patient_report, model_version = manager.generate_patient_report(
+    patient_report, model_version = await run_in_threadpool(
+        manager.generate_patient_report,
         clinical_text=request.clinical_text,
         report_type=request.report_type,
         clinical_indication=request.clinical_indication or "",
@@ -416,7 +455,9 @@ async def simplify_clinical_summary_for_patient(
         patient_report=patient_report,
         latency_ms=latency_ms,
         model_version=model_version,
+        is_insufficient=bool(patient_report.get("is_insufficient", False)),
     )
+
 
 
 @router.post("/summarize/document", response_model=GatewayDocumentSummarizeResponse)
@@ -521,10 +562,45 @@ async def summarize_clinical_document(
             flowsheet = []
 
     if not extracted_text:
-        extracted_text = "Patient clinical documentation reviewed. Vital signs stable, no acute focal distress."
-        sections = {"GENERAL": extracted_text}
+        extracted_text = ""
+        sections = {"GENERAL": "No clinical text or readable document provided."}
 
-    # 4. Sovereign Fine-Tuned Summarizer via Remote Edge Service / ModelManager
+    # 4. Check Clinical Sufficiency to guard against gibberish keystroke spam
+    sufficient, reason = is_clinically_sufficient(extracted_text)
+    if not sufficient:
+        latency_ms = round((time.time() - start_time) * 1000, 2)
+        insufficient_patient_report = {
+            "headline": "No clinical information available to summarize.",
+            "what_was_examined": "Clinical Documentation",
+            "doctor_explanation": "The text entered does not contain recognizable clinical or medical records. Please provide a physician note, visit summary, or lab report so we can generate your care plan.",
+            "key_findings": ["No medical data or clinical symptoms detected in the input document."],
+            "what_it_means": "No diagnosis or care plan could be formulated because no health information was submitted.",
+            "next_steps": ["Enter or upload your medical notes, consultation record, or discharge instructions."],
+            "jargon_translations": [],
+            "questions_for_doctor": ["Can I provide my clinical note or visit report?"],
+            "reading_level": "Grade 6 (Plain Language)",
+            "is_insufficient": True,
+        }
+        return GatewayDocumentSummarizeResponse(
+            summary_id=f"SUM-WARN-{uuid.uuid4().hex[:8].upper()}",
+            patient_id=target_patient_id,
+            summary="Insufficient clinical documentation provided. Clinical notes, vitals, history of present illness, or diagnostic observations are required to formulate an accurate synthesis.",
+            sections={"STATUS": "INSUFFICIENT_CLINICAL_DATA", "DETAILS": reason},
+            key_findings=["No verifiable clinical observations or symptoms detected in the provided source document."],
+            action_items=["Input comprehensive physician notes, SOAP documentation, or upload a readable clinical scan."],
+            citations=[],
+            flowsheet=flowsheet,
+            grounding_score=0.0,
+            ocr_applied=ocr_applied,
+            pages_processed=pages_processed,
+            latency_ms=latency_ms,
+            model_version=request.model_name or "clinixvault-qwen2.5-summarizer",
+            status="insufficient_input",
+            is_insufficient=True,
+            patient_report=insufficient_patient_report,
+        )
+
+    # 5. Sovereign Fine-Tuned Summarizer via Remote Edge Service / ModelManager
     summary_text = ""
     key_findings = []
     action_items = []
@@ -558,11 +634,13 @@ async def summarize_clinical_document(
 
     if not edge_contacted:
         manager = get_model_manager()
-        summary_text, key_findings, action_items, model_version = manager.generate_clinical_summary(
+        summary_text, key_findings, action_items, model_version = await run_in_threadpool(
+            manager.generate_clinical_summary,
             clinical_text=extracted_text,
             summary_type=request.summary_type,
             model_name=request.model_name,
         )
+
 
     # Dynamic sanitization: ensure no hardcoded boilerplate action items surface
     hardcoded_checks = ["correlate with clinical symptomatology", "follow-up with attending physician as indicated", "schedule outpatient specialty follow-up"]
@@ -664,6 +742,16 @@ async def summarize_clinical_document(
         hardware_override=hardware_desc,
     )
 
+    # Generate structured plain-language lay audience explanation
+    manager = get_model_manager()
+    doc_patient_report, _ = await run_in_threadpool(
+        manager.generate_patient_report,
+        clinical_text=summary_text or extracted_text,
+        report_type=request.summary_type,
+        clinical_indication="",
+        model_name=request.model_name,
+    )
+
     return GatewayDocumentSummarizeResponse(
         summary_id=report_id,
         patient_id=target_patient_id,
@@ -678,5 +766,9 @@ async def summarize_clinical_document(
         pages_processed=pages_processed,
         latency_ms=latency_ms,
         model_version=model_version,
+        status="success",
+        is_insufficient=False,
+        patient_report=doc_patient_report,
     )
+
 
