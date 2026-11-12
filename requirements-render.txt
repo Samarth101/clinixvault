@@ -1,0 +1,23 @@
+# ==============================================================================
+# ClinixVault — Render-compatible requirements (CPU-only, no torch/GPU)
+# Used for showcase/gateway deployment on Render free tier
+# Heavy inference packages (torch, transformers, peft) are intentionally excluded
+# because Render free tier has 512MB RAM — torch alone is 2GB+
+# VLM/LLM inference is routed to Google Colab or local node via COLAB_BACKEND_URL
+# ==============================================================================
+
+fastapi>=0.110.0
+uvicorn[standard]>=0.28.0
+pydantic>=2.6.0
+sqlalchemy>=2.0.28
+psycopg2-binary>=2.9.9
+httpx>=0.27.0
+psutil>=5.9.8
+numpy>=1.26.0
+pillow>=10.2.0
+pypdf>=4.0.0
+websockets>=12.0
+pydicom>=2.4.0
+python-jose[cryptography]>=3.3.0
+python-multipart>=0.0.9
+aiofiles>=23.2.1
