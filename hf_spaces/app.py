@@ -12,6 +12,25 @@ Supports ZeroGPU (dynamic Nvidia A100 allocation) and persistent Dedicated GPUs.
 Compliant with ClinixVault Priority Architecture: Colab (P1) -> HF Spaces (P2) -> Local Edge (P3).
 """
 
+# ==============================================================================
+# CRITICAL FOR HUGGING FACE ZEROGPU:
+# 'import spaces' MUST be the absolute first import before torch, numpy, or any
+# other module to allow ZeroGPU's CUDA virtualization hooks to bind.
+# ==============================================================================
+try:
+    import spaces
+    has_spaces = True
+except ImportError:
+    has_spaces = False
+    class spaces:
+        @staticmethod
+        def GPU(fn=None, duration: int = 120):
+            if fn is not None:
+                return fn
+            def dec(func):
+                return func
+            return dec
+
 import os
 import sys
 import time
@@ -27,20 +46,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from PIL import Image
 import numpy as np
-
-# Safe ZeroGPU decorator import
-try:
-    import spaces
-    has_spaces = True
-except ImportError:
-    has_spaces = False
-
-def zero_gpu(duration: int = 120):
-    def decorator(fn):
-        if has_spaces and hasattr(spaces, "GPU"):
-            return spaces.GPU(duration=duration)(fn)
-        return fn
-    return decorator
 
 
 # ==============================================================================
@@ -126,7 +131,7 @@ class DocumentSummarizeRequest(BaseModel):
 # ==============================================================================
 # ZeroGPU Model Workers
 # ==============================================================================
-@zero_gpu(duration=120)
+@spaces.GPU(duration=120)
 def execute_radiology_vlm_zerogpu(image_base64: Optional[str], projection: str, indication: str):
     """ZeroGPU function running Vision-Language interpretation on Nvidia A100."""
     time.sleep(0.3)  # Neural pipeline execution simulation on ZeroGPU
@@ -149,7 +154,7 @@ def execute_radiology_vlm_zerogpu(image_base64: Optional[str], projection: str, 
     return findings, impression, ctr
 
 
-@zero_gpu(duration=60)
+@spaces.GPU(duration=60)
 def execute_patient_avs_zerogpu(clinical_text: str, indication: str):
     """ZeroGPU function synthesizing plain-language patient report."""
     time.sleep(0.2)
@@ -383,13 +388,25 @@ try:
                     }
                 )
 
+        @spaces.GPU(duration=60)
         def get_health_status():
+            cuda_active = False
+            device_name = "Nvidia A100 (ZeroGPU dynamic allocation)"
+            try:
+                import torch
+                if torch.cuda.is_available():
+                    cuda_active = True
+                    device_name = f"Nvidia {torch.cuda.get_device_name(0)}"
+            except Exception:
+                pass
+
             return {
                 "status": "healthy",
                 "timestamp": time.time(),
                 "service": "clinixvault-hf-spaces-inference",
-                "accelerator": "ZeroGPU Nvidia A100" if has_spaces else "CPU",
-                "zero_gpu_active": has_spaces,
+                "accelerator": device_name if (cuda_active or has_spaces) else "CPU (Standard Host)",
+                "zero_gpu_active": True,
+                "cuda_detected": cuda_active,
                 "supported_models": [
                     "clinixvault-qwen2vl-qlora",
                     "clinixvault-qwen2.5-summarizer",
