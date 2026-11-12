@@ -117,8 +117,11 @@ def recluster_conversation_turns(turns: List[Dict[str, str]]) -> List[Dict[str, 
     return clustered
 
 
+IST_TZ = datetime.timezone(datetime.timedelta(hours=5, minutes=30), name="IST")
+
+
 def log_scribe_verbose(patient_id: str, chunk_size: int, decibels: float, speaker: str, transcript: str, buffered_bytes: int = 0):
-    timestamp_str = datetime.datetime.now().strftime("%H:%M:%S.%f")[:-3]
+    timestamp_str = datetime.datetime.now(IST_TZ).strftime("%Y-%m-%d %H:%M:%S IST")
     msg = (
         f"🎙️ [SCRIBE AUDIO STREAM] {timestamp_str} | Patient: {patient_id} | "
         f"Chunk: {chunk_size}B (Buf: {buffered_bytes}B) | SPL: {decibels:.1f} dB | "

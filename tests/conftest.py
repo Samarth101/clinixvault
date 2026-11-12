@@ -26,6 +26,7 @@ _test_graph_file = os.path.join(tempfile.gettempdir(), f"clinixvault_test_graph_
 os.environ["DATABASE_URL"] = f"sqlite:///{_test_db_file}"
 os.environ["GRAPH_SQLITE_PATH"] = _test_graph_file
 os.environ["SQLITE_GRAPH_PATH"] = _test_graph_file
+os.environ["NEO4J_DISABLED"] = "true"
 
 from backend.database.connection import Base, engine, SessionLocal
 from backend.database.models import Patient

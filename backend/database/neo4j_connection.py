@@ -243,6 +243,11 @@ class Neo4jGraphManager:
 
     def _init_connection(self) -> None:
         """Attempts Bolt driver connection with brief timeout."""
+        if os.getenv("NEO4J_DISABLED", "false").lower() in ("true", "1"):
+            self._is_connected = False
+            logger.info("Neo4j explicitly disabled via NEO4J_DISABLED; using in-memory property graph engine.")
+            return
+
         try:
             import socket
             from urllib.parse import urlparse

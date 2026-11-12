@@ -16,6 +16,20 @@ from inference.shared.logger import get_logger
 
 logger = get_logger("clinixvault.audio_transcriber")
 
+# Intercept and patch PyAV >= 14/18 where metadata_errors was removed,
+# preventing faster-whisper from throwing TypeError: open() got an unexpected keyword argument 'metadata_errors'
+try:
+    import av
+    if hasattr(av, "open") and not getattr(av.open, "_is_clinix_patched", False):
+        _orig_av_open = av.open
+        def _safe_av_open(*args, **kwargs):
+            kwargs.pop("metadata_errors", None)
+            return _orig_av_open(*args, **kwargs)
+        _safe_av_open._is_clinix_patched = True
+        av.open = _safe_av_open
+except Exception:
+    pass
+
 
 WHISPER_SILENCE_HALLUCINATIONS = {
     "thank you", "thank you.", "thank you very much", "thank you very much.",
@@ -85,6 +99,19 @@ class WhisperTranscriber:
     def _init_model(self):
         try:
             import gc
+            # Ensure av.open is safe against metadata_errors breaking change
+            try:
+                import av
+                if hasattr(av, "open") and not getattr(av.open, "_is_clinix_patched", False):
+                    _orig_av = av.open
+                    def _safe_open(*args, **kwargs):
+                        kwargs.pop("metadata_errors", None)
+                        return _orig_av(*args, **kwargs)
+                    _safe_open._is_clinix_patched = True
+                    av.open = _safe_open
+            except Exception:
+                pass
+
             from faster_whisper import WhisperModel
 
             # Memory safety check before loading

@@ -84,8 +84,16 @@ export class ScribeWebSocketClient {
                   this.callbacks.onSoapSynthesized(data);
                 }
               } else if (data.type === 'audio_frame_ack' || data.type === 'audio_telemetry_ack') {
-                if (data.decibels && this.callbacks.onDecibels) {
-                  this.callbacks.onDecibels(data.decibels);
+                const db = data.rms_db ?? data.decibels;
+                if (db !== undefined && this.callbacks.onDecibels) {
+                  this.callbacks.onDecibels(db);
+                }
+                if (data.turn && this.callbacks.onSpeakerTurn) {
+                  this.callbacks.onSpeakerTurn(data.turn);
+                }
+              } else if (data.type === 'speaker_turn' || data.type === 'transcription_turn') {
+                if (data.turn && this.callbacks.onSpeakerTurn) {
+                  this.callbacks.onSpeakerTurn(data.turn);
                 }
               }
             }

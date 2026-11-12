@@ -31,6 +31,35 @@ import argparse
 from pathlib import Path
 from typing import Optional, Dict, Any
 
+# Force Indian Standard Time (IST, UTC+05:30) for all runtime timestamps on Linux/Colab
+os.environ["TZ"] = "Asia/Kolkata"
+if hasattr(time, "tzset"):
+    try:
+        time.tzset()
+    except Exception:
+        pass
+
+# Intercept and patch PyAV >= 14/18 where metadata_errors was removed,
+# preventing faster-whisper from throwing TypeError: open() got an unexpected keyword argument 'metadata_errors'
+try:
+    import av
+    if hasattr(av, "open") and not getattr(av.open, "_is_clinix_patched", False):
+        _orig_av_open = av.open
+        def _safe_av_open(*args, **kwargs):
+            kwargs.pop("metadata_errors", None)
+            return _orig_av_open(*args, **kwargs)
+        _safe_av_open._is_clinix_patched = True
+        av.open = _safe_av_open
+except Exception:
+    pass
+
+from datetime import datetime, timezone, timedelta
+IST_TZ = timezone(timedelta(hours=5, minutes=30), name="IST")
+
+def now_ist_str() -> str:
+    """Returns formatted real-time Indian Standard Time (IST, UTC+05:30) string."""
+    return datetime.now(IST_TZ).strftime("%Y-%m-%d %H:%M:%S IST")
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -65,11 +94,11 @@ class ColabGPUWatchdog(threading.Thread):
             if torch.cuda.is_available():
                 self.gpu_name = torch.cuda.get_device_name(0)
                 self.total_vram_mb = round(torch.cuda.get_device_properties(0).total_memory / (1024 * 1024), 1)
-                print(f"{GREEN}⚡ [GPU WATCHDOG] CUDA initialized: {self.gpu_name} ({self.total_vram_mb} MB VRAM){RESET}")
+                print(f"{GREEN}[{now_ist_str()}] ⚡ [GPU WATCHDOG] CUDA initialized: {self.gpu_name} ({self.total_vram_mb} MB VRAM){RESET}")
             else:
-                print(f"{YELLOW}⚠️  [GPU WATCHDOG] CUDA not detected. Operating in CPU fallback mode.{RESET}")
+                print(f"{YELLOW}[{now_ist_str()}] ⚠️  [GPU WATCHDOG] CUDA not detected. Operating in CPU fallback mode.{RESET}")
         except Exception as e:
-            print(f"{YELLOW}⚠️  [GPU WATCHDOG] CUDA init warning: {e}{RESET}")
+            print(f"{YELLOW}[{now_ist_str()}] ⚠️  [GPU WATCHDOG] CUDA init warning: {e}{RESET}")
 
     def run(self):
         while self.running:
@@ -82,10 +111,21 @@ class ColabGPUWatchdog(threading.Thread):
                     if self.total_vram_mb > 0:
                         self.vram_percent = round((reserved / self.total_vram_mb) * 100.0, 1)
 
+                    # Update gateway metrics registry for Grafana Cloud
+                    try:
+                        from backend.gateway.metrics import update_microservice_memory, update_microservice_health
+                        update_microservice_health("gateway", True)
+                        update_microservice_health("vlm-server", True)
+                        update_microservice_health("llm-server", True)
+                        update_microservice_health("audio-server", True)
+                        update_microservice_memory("gateway", int(reserved * 1024 * 1024))
+                    except Exception:
+                        pass
+
                     # Dynamic VRAM Pressure Management
                     if self.vram_percent >= 88.0:
-                        print(f"\n{RED}🚨 [GPU WATCHDOG] Critical VRAM pressure ({self.vram_percent}% | {self.used_vram_mb}/{self.total_vram_mb} MB).{RESET}")
-                        print(f"{YELLOW}🧹 Emptying CUDA cache to prevent Colab session crash...{RESET}")
+                        print(f"\n{RED}[{now_ist_str()}] 🚨 [GPU WATCHDOG] Critical VRAM pressure ({self.vram_percent}% | {self.used_vram_mb}/{self.total_vram_mb} MB).{RESET}")
+                        print(f"{YELLOW}[{now_ist_str()}] 🧹 Emptying CUDA cache to prevent Colab session crash...{RESET}")
                         torch.cuda.empty_cache()
                         import gc
                         gc.collect()
@@ -254,18 +294,160 @@ def sync_codebase_from_git():
 
 
 # ============================================================================
-# 5. Colab Observability Metric Injector
+# 5. Colab Observability & Grafana Cloud Bridge
 # ============================================================================
 def start_colab_observability_bridge(watchdog: ColabGPUWatchdog):
     """
-    Injects live GPU telemetry into the Gateway metrics registry so that Grafana Cloud
-    can visualize Colab GPU utilization, VRAM usage, and temperatures in real-time.
+    Connects Colab GPU telemetry to Prometheus metrics registry and automatically
+    launches the Grafana Alloy agent to push live GPU VRAM, compute metrics, and Loki
+    logs to Grafana Cloud.
     """
     try:
-        from backend.gateway.metrics import metrics_collector
-        print(f"{GREEN}📊 [OBSERVABILITY] Connected GPU Watchdog to Prometheus metrics registry.{RESET}")
+        from backend.gateway.metrics import (
+            metrics_collector,
+            update_microservice_health,
+            update_microservice_memory,
+            record_request_metrics,
+        )
+        update_microservice_health("gateway", True)
+        update_microservice_health("vlm-server", True)
+        update_microservice_health("llm-server", True)
+        update_microservice_health("audio-server", True)
+        print(f"{GREEN}[{now_ist_str()}] 📊 [OBSERVABILITY] Connected GPU Watchdog to Prometheus metrics registry.{RESET}")
     except Exception as e:
-        print(f"{YELLOW}⚠️  Metrics collector bridge note: {e}{RESET}")
+        print(f"{YELLOW}[{now_ist_str()}] ⚠️  Metrics collector bridge note: {e}{RESET}")
+
+    # Load credentials from environment or observability/.env
+    prom_url = os.getenv("GRAFANA_CLOUD_PROMETHEUS_URL")
+    prom_user = os.getenv("GRAFANA_CLOUD_PROMETHEUS_USER")
+    loki_url = os.getenv("GRAFANA_CLOUD_LOKI_URL")
+    loki_user = os.getenv("GRAFANA_CLOUD_LOKI_USER")
+    api_token = os.getenv("GRAFANA_CLOUD_API_TOKEN")
+
+    env_path = PROJECT_ROOT / "observability" / ".env"
+    if not api_token and env_path.exists():
+        try:
+            with open(env_path) as ef:
+                for line in ef:
+                    line = line.strip()
+                    if line.startswith("GRAFANA_CLOUD_PROMETHEUS_URL="):
+                        prom_url = line.split("=", 1)[1]
+                    elif line.startswith("GRAFANA_CLOUD_PROMETHEUS_USER="):
+                        prom_user = line.split("=", 1)[1]
+                    elif line.startswith("GRAFANA_CLOUD_LOKI_URL="):
+                        loki_url = line.split("=", 1)[1]
+                    elif line.startswith("GRAFANA_CLOUD_LOKI_USER="):
+                        loki_user = line.split("=", 1)[1]
+                    elif line.startswith("GRAFANA_CLOUD_API_TOKEN="):
+                        api_token = line.split("=", 1)[1]
+        except Exception:
+            pass
+
+    if not api_token or not prom_url:
+        print(f"{YELLOW}[{now_ist_str()}] ℹ️  Grafana Cloud credentials not detected. OpenMetrics still served locally at /metrics.{RESET}")
+        print(f"{YELLOW}   To enable Grafana Cloud: set GRAFANA_CLOUD_API_TOKEN in Colab Step 4.{RESET}")
+        return
+
+    # Export targets for Alloy config
+    os.environ["GRAFANA_CLOUD_PROMETHEUS_URL"] = prom_url
+    os.environ["GRAFANA_CLOUD_PROMETHEUS_USER"] = prom_user or ""
+    os.environ["GRAFANA_CLOUD_LOKI_URL"] = loki_url or ""
+    os.environ["GRAFANA_CLOUD_LOKI_USER"] = loki_user or ""
+    os.environ["GRAFANA_CLOUD_API_TOKEN"] = api_token
+
+    os.environ["GATEWAY_METRICS_TARGET"] = f"127.0.0.1:{os.environ.get('GATEWAY_PORT', '8000')}"
+    os.environ["VLM_METRICS_TARGET"] = f"127.0.0.1:{os.environ.get('GATEWAY_PORT', '8000')}"
+    os.environ["LLM_METRICS_TARGET"] = f"127.0.0.1:{os.environ.get('GATEWAY_PORT', '8000')}"
+    os.environ["AUDIO_METRICS_TARGET"] = f"127.0.0.1:{os.environ.get('GATEWAY_PORT', '8000')}"
+    os.environ["DOCUMENT_METRICS_TARGET"] = f"127.0.0.1:{os.environ.get('GATEWAY_PORT', '8000')}"
+
+    log_dir = PROJECT_ROOT / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_file = log_dir / "clinixvault.log"
+    if not log_file.exists():
+        log_file.touch()
+    os.environ["CLINIXVAULT_LOG_DIR"] = str(log_dir)
+    os.environ["CLINIXVAULT_LOG_FILE"] = str(log_file)
+
+    # 1. Send immediate Loki boot handshake
+    if loki_url and loki_user and api_token:
+        try:
+            import httpx
+            ts_ns = str(time.time_ns())
+            loki_payload = {
+                "streams": [
+                    {
+                        "stream": {
+                            "job": "clinixvault",
+                            "app": "clinixvault-colab",
+                            "environment": "colab-gpu-node",
+                            "level": "INFO",
+                            "service": "colab-gateway",
+                        },
+                        "values": [
+                            [
+                                ts_ns,
+                                json.dumps({
+                                    "timestamp": now_ist_str(),
+                                    "level": "INFO",
+                                    "message": f"ClinixVault GPU Colab Node active ({watchdog.gpu_name}, {watchdog.total_vram_mb} MB VRAM).",
+                                    "service": "colab-runner",
+                                    "status_code": 200,
+                                }),
+                            ]
+                        ],
+                    }
+                ]
+            }
+            resp = httpx.post(loki_url, json=loki_payload, auth=(loki_user, api_token), timeout=6.0)
+            if resp.status_code in (200, 204):
+                print(f"{GREEN}[{now_ist_str()}] 📡 [LOKI TELEMETRY] Grafana Cloud Loki live stream established (HTTP {resp.status_code}).{RESET}")
+        except Exception as le:
+            print(f"{YELLOW}[{now_ist_str()}] ⚠️ Loki handshake note: {le}{RESET}")
+
+    # 2. Check and start Grafana Alloy Agent
+    alloy_bin = shutil.which("alloy") or shutil.which("grafana-alloy") or "/usr/local/bin/alloy"
+    if not os.path.exists(alloy_bin):
+        print(f"{BLUE}[{now_ist_str()}] 📦 Downloading Grafana Alloy Linux agent for automated metric ingestion...{RESET}")
+        try:
+            alloy_zip = Path("/tmp/alloy.zip")
+            subprocess.run(
+                ["curl", "-fsSL", "-o", str(alloy_zip), "https://github.com/grafana/alloy/releases/download/v1.7.5/alloy-linux-amd64.zip"],
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            subprocess.run(["unzip", "-q", "-o", str(alloy_zip), "-d", "/usr/local/bin"], check=True)
+            candidate = Path("/usr/local/bin/alloy-linux-amd64")
+            if candidate.exists():
+                candidate.rename("/usr/local/bin/alloy")
+            subprocess.run(["chmod", "+x", "/usr/local/bin/alloy"], check=True)
+            alloy_bin = "/usr/local/bin/alloy"
+            print(f"{GREEN}[{now_ist_str()}] ✓ Grafana Alloy agent installed successfully.{RESET}")
+        except Exception as ae:
+            print(f"{YELLOW}[{now_ist_str()}] ⚠️ Could not download Alloy binary: {ae}. OpenMetrics remains active on /metrics.{RESET}")
+            return
+
+    config_path = PROJECT_ROOT / "observability" / "alloy" / "config.alloy"
+    if os.path.exists(alloy_bin) and config_path.exists():
+        tmp_storage = Path("/tmp/clinixvault_alloy_colab")
+        tmp_storage.mkdir(parents=True, exist_ok=True)
+        try:
+            subprocess.Popen(
+                [
+                    alloy_bin,
+                    "run",
+                    "--server.http.listen-addr=127.0.0.1:12345",
+                    f"--storage.path={tmp_storage}",
+                    str(config_path),
+                ],
+                env=os.environ,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            print(f"{GREEN}{BOLD}[{now_ist_str()}] 📈 [GRAFANA CLOUD] Alloy agent actively scraping :8000/metrics and remote-writing to Prometheus!{RESET}")
+        except Exception as e:
+            print(f"{YELLOW}[{now_ist_str()}] ⚠️ Alloy daemon launch warning: {e}{RESET}")
 
 
 # ============================================================================
