@@ -58,10 +58,10 @@ const DEFAULT_HF_SPACES_URL = 'https://clinixvault-inference.hf.space';
 const DEFAULT_RENDER_URL = 'https://clinixvault-backend.onrender.com';
 const DEFAULT_LOCAL_URL = 'http://127.0.0.1:8000';
 
-const LATENCY_FAILOVER_THRESHOLD_MS = 1500;
+const LATENCY_FAILOVER_THRESHOLD_MS = 6000;
 const CONSECUTIVE_FAILURE_THRESHOLD = 3;
-const HEARTBEAT_INTERVAL_MS = 2500;
-const PROBE_TIMEOUT_MS = 3500;
+const HEARTBEAT_INTERVAL_MS = 3000;
+const PROBE_TIMEOUT_MS = 6500;
 
 class NodeFailoverAgent {
   private colabUrl: string = DEFAULT_COLAB_URL;
@@ -331,7 +331,11 @@ class NodeFailoverAgent {
       this.consecutiveFailures = 0;
 
       // Track latency threshold on cloud GPU nodes
-      if (result.latencyMs > LATENCY_FAILOVER_THRESHOLD_MS && targetNode !== 'local') {
+      // Note: Render Cloud Gateway is a cloud web service whose healthy international WAN
+      // latency (1-3s) must NOT be penalized or downgraded to localhost.
+      if (targetNode === 'render') {
+        this.highLatencyCount = 0;
+      } else if (result.latencyMs > LATENCY_FAILOVER_THRESHOLD_MS && targetNode !== 'local') {
         this.highLatencyCount += 1;
       } else {
         this.highLatencyCount = 0;
@@ -355,10 +359,11 @@ class NodeFailoverAgent {
       this.consecutiveFailures += 1;
     }
 
-    // Failover evaluation: Colab -> HF Spaces -> Local
+    // Failover evaluation: Colab -> HF Spaces -> Render Gateway -> Local Edge
     if (this.isAutoFailoverEnabled) {
       const failureLimit = (result.isTimeout && targetNode === 'local') ? 4 : CONSECUTIVE_FAILURE_THRESHOLD;
-      const shouldTrigger = this.consecutiveFailures >= failureLimit || this.highLatencyCount >= 2;
+      // High latency failover only triggers after 4 consecutive severely degraded heartbeats (>6000ms)
+      const shouldTrigger = this.consecutiveFailures >= failureLimit || (targetNode !== 'render' && this.highLatencyCount >= 4);
 
       if (shouldTrigger) {
         const failReason =
@@ -376,10 +381,10 @@ class NodeFailoverAgent {
 
   /**
    * Execute Tiered Failover following strict priority:
-   * Colab (P1) -> HF Spaces (P2) -> Local Edge (P3)
+   * Colab (P1) -> HF Spaces (P2) -> Render Gateway -> Local Edge (P3)
    */
   private async executeTieredFailover(failedNode: NodeTarget, reason: string): Promise<void> {
-    console.warn(`[FailoverAgent] ⚡ Node [${failedNode}] degraded/offline (${reason}). Evaluating GPU tier fallback...`);
+    console.warn(`[FailoverAgent] ⚡ Node [${failedNode}] degraded/offline (${reason}). Evaluating fallback tier...`);
 
     // Priority 1: Check Colab GPU if not the failed node
     if (failedNode !== 'colab' && this.colabUrl) {
@@ -394,23 +399,32 @@ class NodeFailoverAgent {
     if (failedNode !== 'hf_spaces' && this.hfSpacesUrl) {
       const hfProbe = await this.probeEndpoint(this.hfSpacesUrl);
       if (hfProbe.ok) {
-        await this.switchToHfSpaces(`Failover from ${failedNode}: HF Spaces ZeroGPU node online (${hfProbe.latencyMs}ms)`);
+        await this.switchToHfSpaces(`Failover from ${failedNode}: HF Spaces node online (${hfProbe.latencyMs}ms)`);
         return;
       }
     }
 
-    // Priority 3: Fall back to Local Edge Node if not the failed node
+    // Priority 3: Check Render Cloud Gateway if not the failed node
+    if (failedNode !== 'render' && this.renderUrl) {
+      const renderProbe = await this.probeEndpoint(this.renderUrl);
+      if (renderProbe.ok) {
+        await this.switchToRender(`Failover from ${failedNode}: Render Cloud Gateway online (${renderProbe.latencyMs}ms)`);
+        return;
+      }
+    }
+
+    // Priority 4: Fall back to Sovereign Local Edge Node if not the failed node
     if (failedNode !== 'local' && this.localUrl) {
       const localProbe = await this.probeEndpoint(this.localUrl);
       if (localProbe.ok) {
-        await this.switchToLocal(`Cloud GPU unavailable; failed over to Sovereign Local Edge Node`);
+        await this.switchToLocal(`Cloud services unavailable; failed over to Sovereign Local Edge Node`);
         return;
       }
     }
 
     // If all configured nodes are unreachable
     this.activeNode = 'offline';
-    this.lastFailoverReason = `All GPU nodes unreachable (${reason})`;
+    this.lastFailoverReason = `All backend nodes unreachable (${reason})`;
     this.notify();
   }
 
@@ -533,11 +547,11 @@ class NodeFailoverAgent {
   private async probeHigherTierRecovery(): Promise<void> {
     if (!this.isAutoFailoverEnabled) return;
 
-    // If running on Local or HF Spaces, check if Colab (P1) is back online
-    if (this.activeNode === 'local' || this.activeNode === 'hf_spaces' || this.activeNode === 'offline') {
+    // If running on Local or HF Spaces or Render, check if Colab (P1) is back online
+    if (this.activeNode === 'local' || this.activeNode === 'hf_spaces' || this.activeNode === 'render' || this.activeNode === 'offline') {
       if (this.colabUrl) {
         const colabProbe = await this.probeEndpoint(this.colabUrl);
-        if (colabProbe.ok && colabProbe.latencyMs < 1200) {
+        if (colabProbe.ok && colabProbe.latencyMs < 2500) {
           this.colabHealthy = true;
           console.info(`[FailoverAgent] 🚀 Priority 1 Colab GPU recovered (${colabProbe.latencyMs}ms). Promoting active node.`);
           await this.switchToColab(`Priority 1 Colab GPU recovered (${colabProbe.latencyMs}ms)`);
@@ -550,10 +564,21 @@ class NodeFailoverAgent {
     if (this.activeNode === 'local' || this.activeNode === 'offline') {
       if (this.hfSpacesUrl) {
         const hfProbe = await this.probeEndpoint(this.hfSpacesUrl);
-        if (hfProbe.ok && hfProbe.latencyMs < 1500) {
+        if (hfProbe.ok && hfProbe.latencyMs < 3500) {
           this.hfSpacesHealthy = true;
-          console.info(`[FailoverAgent] ⚡ Priority 2 HF Spaces ZeroGPU node online (${hfProbe.latencyMs}ms). Promoting active node.`);
-          await this.switchToHfSpaces(`Priority 2 HF Spaces ZeroGPU node online (${hfProbe.latencyMs}ms)`);
+          console.info(`[FailoverAgent] ⚡ Priority 2 HF Spaces node online (${hfProbe.latencyMs}ms). Promoting active node.`);
+          await this.switchToHfSpaces(`Priority 2 HF Spaces node online (${hfProbe.latencyMs}ms)`);
+          return;
+        }
+      }
+
+      // If neither Colab nor HF Spaces are online, check if Render Cloud Gateway is available
+      if (this.renderUrl) {
+        const renderProbe = await this.probeEndpoint(this.renderUrl);
+        if (renderProbe.ok) {
+          this.renderHealthy = true;
+          console.info(`[FailoverAgent] ☁️ Render Cloud Gateway online (${renderProbe.latencyMs}ms). Promoting active node.`);
+          await this.switchToRender(`Render Cloud Gateway online (${renderProbe.latencyMs}ms)`);
           return;
         }
       }

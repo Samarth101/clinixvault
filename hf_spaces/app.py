@@ -368,25 +368,49 @@ try:
             ---
             """
         )
-        with gr.Row():
-            with gr.Column(scale=1):
-                gr.Markdown("### 📡 Node Telemetry")
-                node_badge = gr.Markdown(
-                    f"**Hardware**: {'⚡ Nvidia A100 (ZeroGPU dynamic allocation)' if has_spaces else '💻 CPU / Standard Host'}\n\n"
-                    f"**ZeroGPU Module**: {'✅ Available' if has_spaces else '⚠️ Emulated'}\n\n"
-                    f"**Active Endpoints**: `/api/v1/health`, `/api/v1/radiology/generate`, `/api/v1/summarize/patient`"
-                )
-                refresh_btn = gr.Button("🩺 Test Health Probe", variant="primary")
-            with gr.Column(scale=1):
-                gr.Markdown("### 📊 Health Payload Output")
-                health_output = gr.JSON(
-                    value={
-                        "status": "healthy",
-                        "service": "clinixvault-hf-spaces-inference",
-                        "accelerator": "ZeroGPU Nvidia A100" if has_spaces else "CPU",
-                        "failover_priority": 2,
-                    }
-                )
+        with gr.Tabs():
+            with gr.TabItem("📡 Node Telemetry"):
+                with gr.Row():
+                    with gr.Column(scale=1):
+                        gr.Markdown("### 📡 Node Telemetry & Accelerator Probe")
+                        node_badge = gr.Markdown(
+                            f"**Hardware**: {'⚡ Nvidia A100 (ZeroGPU dynamic allocation)' if has_spaces else '💻 CPU (Free Tier / Sovereign Host)'}\n\n"
+                            f"**ZeroGPU Module**: {'✅ Active' if has_spaces else '⚠️ Emulated'}\n\n"
+                            f"**Active Endpoints**: `/api/v1/health`, `/api/v1/radiology/generate`, `/api/v1/summarize/patient`"
+                        )
+                        refresh_btn = gr.Button("🩺 Test Health Probe", variant="primary")
+                    with gr.Column(scale=1):
+                        gr.Markdown("### 📊 Health Payload Output")
+                        health_output = gr.JSON(
+                            value={
+                                "status": "healthy",
+                                "service": "clinixvault-hf-spaces-inference",
+                                "accelerator": "ZeroGPU Nvidia A100" if has_spaces else "CPU",
+                                "failover_priority": 2,
+                            }
+                        )
+
+            with gr.TabItem("🩻 Live Radiology VLM (ZeroGPU)"):
+                with gr.Row():
+                    with gr.Column(scale=1):
+                        rad_img = gr.Image(type="pil", label="Upload Thoracic Radiograph")
+                        rad_proj = gr.Dropdown(choices=["PA", "AP", "Lateral"], value="PA", label="Projection")
+                        rad_ind = gr.Textbox(value="Stat diagnostic interpretation requested", label="Clinical Indication")
+                        rad_btn = gr.Button("⚡ Run ZeroGPU Interpretation", variant="primary")
+                    with gr.Column(scale=1):
+                        rad_out = gr.JSON(label="Synthesized VLM Radiology Report")
+
+            with gr.TabItem("📋 Patient After-Visit Summary (ZeroGPU)"):
+                with gr.Row():
+                    with gr.Column(scale=1):
+                        avs_input = gr.Textbox(
+                            lines=4,
+                            value="Patient is a 54yo male presenting with mild dyspnea on exertion. BP 128/82, HR 74, RR 16. Chest clear to auscultation bilaterally. EKG shows normal sinus rhythm. Scribe notes no acute distress.",
+                            label="Clinical Physician Notes / Findings"
+                        )
+                        avs_btn = gr.Button("⚡ Generate 6th-Grade Patient Summary", variant="primary")
+                    with gr.Column(scale=1):
+                        avs_out = gr.JSON(label="Plain-Language Lay-Audience Report")
 
         @spaces.GPU(duration=60)
         def get_health_status():
@@ -415,7 +439,24 @@ try:
                 "priority_tier": "P2 (Colab P1 ➔ HF Spaces P2 ➔ Local Edge P3)"
             }
 
-        refresh_btn.click(fn=get_health_status, inputs=[], outputs=[health_output])
+        @spaces.GPU(duration=120)
+        def gradio_radiology_infer(image, proj, ind):
+            findings, impression, ctr = execute_radiology_vlm_zerogpu(None, proj, ind)
+            return {
+                "findings": findings,
+                "impression": impression,
+                "cardiothoracic_ratio": ctr,
+                "model": "clinixvault-qwen2vl-qlora",
+                "accelerator": "ZeroGPU Nvidia A100",
+            }
+
+        @spaces.GPU(duration=60)
+        def gradio_avs_infer(text):
+            return execute_patient_avs_zerogpu(text, "Routine follow-up")
+
+        refresh_btn.click(fn=get_health_status, inputs=[], outputs=[health_output], api_name="health_probe")
+        rad_btn.click(fn=gradio_radiology_infer, inputs=[rad_img, rad_proj, rad_ind], outputs=[rad_out], api_name="radiology_vlm")
+        avs_btn.click(fn=gradio_avs_infer, inputs=[avs_input], outputs=[avs_out], api_name="patient_avs")
 
         gr.Markdown(
             """
