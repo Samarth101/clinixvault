@@ -139,9 +139,9 @@ export const HeaderBar: React.FC<HeaderBarProps> = React.memo(({
 
   return (
     <>
-    <header className="w-full glass-card px-2.5 sm:px-4 py-2 mb-3 shrink-0 flex items-center justify-between gap-2 sm:gap-3 border border-white/90 dark:border-slate-800 shadow-diffuse z-40 backdrop-blur-3xl bg-white/85 dark:bg-slate-900/85 transition-all duration-200 min-w-0 overflow-hidden">
+    <header className="w-full glass-card px-2.5 sm:px-4 py-2 mb-3 shrink-0 flex items-center justify-between gap-2 border border-white/90 dark:border-slate-800 shadow-diffuse z-40 backdrop-blur-3xl bg-white/85 dark:bg-slate-900/85 transition-all duration-200 min-w-0">
       {/* Brand & Clinician Session */}
-      <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0 flex-1 mr-2">
+      <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0 shrink-0">
         <div 
           onClick={onNavigateLanding}
           className="flex items-center gap-2 cursor-pointer group shrink-0"
@@ -168,16 +168,16 @@ export const HeaderBar: React.FC<HeaderBarProps> = React.memo(({
         <div className="hidden xl:block h-5 w-[1px] bg-slate-200/80 dark:bg-slate-700/80 shrink-0" />
 
         {/* Doctor Persona Card with Interactive Dropdown */}
-        <div className="relative min-w-0 shrink">
+        <div className="relative min-w-0 shrink-0">
           <button 
             onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-            className="flex items-center gap-1.5 sm:gap-2 bg-slate-50/90 dark:bg-slate-800/80 hover:bg-slate-100/90 dark:hover:bg-slate-700/80 px-2 sm:px-2.5 py-1.5 rounded-xl border border-slate-200/70 dark:border-slate-700/70 shadow-xs transition-all cursor-pointer text-left min-w-0 max-w-full"
+            className="flex items-center gap-1.5 sm:gap-2 bg-slate-50/90 dark:bg-slate-800/80 hover:bg-slate-100/90 dark:hover:bg-slate-700/80 px-2 sm:px-2.5 py-1.5 rounded-xl border border-slate-200/70 dark:border-slate-700/70 shadow-xs transition-all cursor-pointer text-left min-w-0"
             title="Clinician Account & Profile"
           >
             <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-clinical-blue text-white flex items-center justify-center font-bold text-[11px] sm:text-xs shadow-xs shrink-0">
               {currentUser.avatarInitials || 'MD'}
             </div>
-            <div className="hidden md:block min-w-0 max-w-[100px] xl:max-w-[140px] 2xl:max-w-[180px] truncate">
+            <div className="hidden sm:block min-w-0 max-w-[85px] md:max-w-[110px] lg:max-w-[140px] xl:max-w-[170px] truncate">
               <div className="flex items-center gap-1 min-w-0">
                 <span className="text-xs font-bold text-slate-900 dark:text-white truncate">{currentUser.name}</span>
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
@@ -379,7 +379,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = React.memo(({
         {onExportNote && (
           <button
             onClick={onExportNote}
-            className="hidden lg:flex items-center gap-1 px-1.5 sm:px-2 py-1.5 rounded-xl bg-slate-100/90 dark:bg-slate-800/90 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200/80 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-semibold shadow-xs transition-all shrink-0 cursor-pointer"
+            className="hidden xl:flex items-center gap-1 px-1.5 sm:px-2 py-1.5 rounded-xl bg-slate-100/90 dark:bg-slate-800/90 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200/80 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-semibold shadow-xs transition-all shrink-0 cursor-pointer"
             title="Export Current Clinical Note & FHIR Bundle"
           >
             <Download className="w-3.5 h-3.5 text-slate-500" />
@@ -392,7 +392,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = React.memo(({
           whileHover={{ scale: 1.03 }}
           whileTap={{ scale: 0.97 }}
           onClick={onOpenSafetyModal}
-          className="hidden lg:flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-500/25 transition-all text-xs font-bold group cursor-pointer shadow-xs shrink-0"
+          className="hidden xl:flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-500/25 transition-all text-xs font-bold group cursor-pointer shadow-xs shrink-0"
           title="Air-Gapped Sovereign Execution"
         >
           <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />

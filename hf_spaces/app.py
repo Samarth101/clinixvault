@@ -412,7 +412,6 @@ try:
                     with gr.Column(scale=1):
                         avs_out = gr.JSON(label="Plain-Language Lay-Audience Report")
 
-        @spaces.GPU(duration=60)
         def get_health_status():
             cuda_active = False
             device_name = "Nvidia A100 (ZeroGPU dynamic allocation)"
@@ -468,13 +467,31 @@ try:
             """
         )
 
-    # Mount Gradio onto the existing FastAPI application
-    app = gr.mount_gradio_app(app, demo, path="/")
+    # Attach all FastAPI REST routes directly to Gradio's internal FastAPI engine
+    demo.app.include_router(app.router)
+    demo.app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 except Exception as e:
-    # Fallback to standard FastAPI if Gradio is not loaded
-    pass
+    demo = None
+    print(f"Warning: Gradio failed to initialize: {e}")
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 7860)))
+    port = int(os.environ.get("PORT", 7860))
+    if demo is not None:
+        print(f"🏥 Starting ClinixVault ZeroGPU Inference Engine with Gradio Queue on port {port}...")
+        demo.queue().launch(
+            server_name="0.0.0.0",
+            server_port=port,
+            share=False,
+            show_error=True,
+        )
+    else:
+        import uvicorn
+        print(f"🏥 Starting ClinixVault FastAPI fallback on port {port}...")
+        uvicorn.run(app, host="0.0.0.0", port=port)
 

@@ -178,6 +178,7 @@ async def create_patient(
 
     # Synchronize with Knowledge Graph
     full_name = f"{new_patient.first_name} {new_patient.last_name}".strip()
+    logger.info(f"🏥 [PATIENT REGISTERED] Name: {full_name} | MRN: {new_patient.mrn} | ID: {new_patient.id} | Chief Complaint: {payload.chief_complaint or 'Clinical evaluation'}")
     try:
         from backend.database.graph_store import get_graph_store
         graph_store = get_graph_store()

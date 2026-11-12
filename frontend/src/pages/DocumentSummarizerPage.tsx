@@ -239,7 +239,12 @@ export const DocumentSummarizerPage: React.FC = () => {
 
               <button
                 onClick={handleGenerateSummary}
-                disabled={isProcessing || !inputText.trim() || inputText.trim().length < 4}
+                disabled={isProcessing || !inputText.trim() || inputText.trim().length < 8 || inputText.trim().split(/\s+/).filter(Boolean).length < 2}
+                title={
+                  !inputText.trim() || inputText.trim().length < 8 || inputText.trim().split(/\s+/).filter(Boolean).length < 2
+                    ? "Enter at least 2 clinical words or paste a medical document to synthesize"
+                    : "Synthesize structured clinical summary and patient AVS"
+                }
                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold text-xs shadow-md shadow-blue-500/20 disabled:opacity-50 transition-all cursor-pointer"
               >
 

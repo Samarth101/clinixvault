@@ -1457,7 +1457,7 @@ export const RadiologyStudioPage: React.FC<RadiologyStudioPageProps> = ({ onOpen
         </div>
 
         {/* Study Pills Carousel */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1 scrollbar-thin">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden scroll-smooth">
           {casesList.length === 0 ? (
             <div className="py-2 px-3 text-xs text-slate-400 font-mono italic">
               No clinical radiograph studies loaded. Click 'Upload Patient Radiograph' above to import and interpret a study.
