@@ -1317,7 +1317,9 @@ export const clinixApi = {
   /**
    * Register a new patient dynamically
    */
-  async createPatient(data: PatientCreateRequest): Promise<PatientRosterItem | null> {
+  async createPatient(data: PatientCreateRequest): Promise<PatientRosterItem> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
     try {
       const resp = await fetch(`${getApiBaseUrl()}/api/v1/patients`, {
         method: 'POST',
@@ -1327,14 +1329,26 @@ export const clinixApi = {
           Authorization: 'Bearer vault-local-admin-token',
         },
         body: JSON.stringify(data),
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
       if (resp.ok) {
-        return await resp.json();
+        const created: PatientRosterItem = await resp.json();
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('clinixvault:patient_created', { detail: created }));
+        }
+        return created;
       }
-    } catch {
-      // offline fallback
+      const errData = await resp.json().catch(() => ({}));
+      const msg = errData?.detail || `Patient creation failed (HTTP ${resp.status})`;
+      throw new Error(msg);
+    } catch (err: any) {
+      clearTimeout(timeout);
+      const isTimeout = err?.name === 'AbortError';
+      const errorMsg = isTimeout ? 'Patient registration timed out after 15s' : (err?.message || 'Network error');
+      console.warn('[clinixApi.createPatient] Error:', errorMsg);
+      throw new Error(errorMsg);
     }
-    return null;
   },
 
   /**

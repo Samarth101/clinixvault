@@ -66,7 +66,17 @@ export const ProvenanceFHIRPage: React.FC<ProvenanceFHIRPageProps> = ({ onNaviga
       }
     };
     fetchPatients();
-    return () => { mounted = false; };
+
+    window.addEventListener('clinixvault:backend_changed', fetchPatients);
+    window.addEventListener('clinixvault:node_failover', fetchPatients);
+    window.addEventListener('clinixvault:patient_created', fetchPatients);
+
+    return () => { 
+      mounted = false; 
+      window.removeEventListener('clinixvault:backend_changed', fetchPatients);
+      window.removeEventListener('clinixvault:node_failover', fetchPatients);
+      window.removeEventListener('clinixvault:patient_created', fetchPatients);
+    };
   }, []);
 
   // 2. Load selected patient reports and construct live provenance & FHIR

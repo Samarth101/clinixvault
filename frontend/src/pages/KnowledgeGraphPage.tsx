@@ -102,8 +102,16 @@ export const KnowledgeGraphPage: React.FC = () => {
       }
     };
     void loadDynamicRoster();
+
+    window.addEventListener('clinixvault:backend_changed', loadDynamicRoster);
+    window.addEventListener('clinixvault:node_failover', loadDynamicRoster);
+    window.addEventListener('clinixvault:patient_created', loadDynamicRoster);
+
     return () => {
       isMounted = false;
+      window.removeEventListener('clinixvault:backend_changed', loadDynamicRoster);
+      window.removeEventListener('clinixvault:node_failover', loadDynamicRoster);
+      window.removeEventListener('clinixvault:patient_created', loadDynamicRoster);
     };
   }, []);
 

@@ -43,6 +43,7 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onNavigate }) => {
   // New patient modal state
   const [isNewPatientModalOpen, setIsNewPatientModalOpen] = useState<boolean>(false);
   const [isSubmittingNewPatient, setIsSubmittingNewPatient] = useState<boolean>(false);
+  const [createError, setCreateError] = useState<string | null>(null);
   const [newPatientForm, setNewPatientForm] = useState({
     firstName: '',
     lastName: '',
@@ -75,6 +76,29 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onNavigate }) => {
 
   useEffect(() => {
     void fetchRoster();
+
+    const handleBackendChange = () => {
+      void fetchRoster();
+    };
+
+    const handlePatientCreated = (evt: any) => {
+      const created = evt?.detail as PatientRosterItem;
+      if (created && created.id) {
+        setPatients((prev) => [created, ...prev.filter((p) => p.id !== created.id)]);
+      }
+    };
+
+    window.addEventListener('clinixvault:backend_changed', handleBackendChange);
+    window.addEventListener('clinixvault:node_failover', handleBackendChange);
+    window.addEventListener('clinixvault:backend_recovered', handleBackendChange);
+    window.addEventListener('clinixvault:patient_created', handlePatientCreated);
+
+    return () => {
+      window.removeEventListener('clinixvault:backend_changed', handleBackendChange);
+      window.removeEventListener('clinixvault:node_failover', handleBackendChange);
+      window.removeEventListener('clinixvault:backend_recovered', handleBackendChange);
+      window.removeEventListener('clinixvault:patient_created', handlePatientCreated);
+    };
   }, []);
 
   const openPatientDetail = async (patientId: string) => {
@@ -116,6 +140,7 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onNavigate }) => {
     if (!newPatientForm.firstName.trim() || !newPatientForm.lastName.trim()) return;
 
     setIsSubmittingNewPatient(true);
+    setCreateError(null);
     try {
       const created = await clinixApi.createPatient({
         first_name: newPatientForm.firstName.trim(),
@@ -138,7 +163,9 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onNavigate }) => {
         if (typeof window !== 'undefined' && created.id) {
           localStorage.setItem('clinixvault_active_patient_id', created.id);
         }
-        await fetchRoster();
+        // Instant optimistic display (<16ms)
+        setPatients((prev) => [created, ...prev.filter((p) => p.id !== created.id)]);
+        setSelectedPatientId(created.id);
         setIsNewPatientModalOpen(false);
         setNewPatientForm({
           firstName: '',
@@ -153,9 +180,12 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onNavigate }) => {
           spo2: '98%',
           temp: '98.6°F',
         });
+        // Background roster reconciliation
+        void fetchRoster();
       }
-    } catch (err) {
+    } catch (err: any) {
       console.warn('Create patient error:', err);
+      setCreateError(err?.message || 'Failed to register patient in database. Check backend connection.');
     } finally {
       setIsSubmittingNewPatient(false);
     }
@@ -656,6 +686,12 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onNavigate }) => {
               </div>
 
               <form onSubmit={handleCreatePatient} className="p-6 space-y-4 text-xs">
+                {createError && (
+                  <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 shrink-0 text-rose-500" />
+                    <span className="font-medium">{createError}</span>
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">First Name *</label>

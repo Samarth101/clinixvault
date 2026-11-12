@@ -389,7 +389,23 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
   useEffect(() => {
     void loadDynamicRoster();
     const interval = setInterval(loadDynamicRoster, 8000);
-    return () => clearInterval(interval);
+
+    const handleBackendChange = () => {
+      void loadDynamicRoster();
+    };
+
+    window.addEventListener('clinixvault:backend_changed', handleBackendChange);
+    window.addEventListener('clinixvault:node_failover', handleBackendChange);
+    window.addEventListener('clinixvault:backend_recovered', handleBackendChange);
+    window.addEventListener('clinixvault:patient_created', handleBackendChange);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('clinixvault:backend_changed', handleBackendChange);
+      window.removeEventListener('clinixvault:node_failover', handleBackendChange);
+      window.removeEventListener('clinixvault:backend_recovered', handleBackendChange);
+      window.removeEventListener('clinixvault:patient_created', handleBackendChange);
+    };
   }, [loadDynamicRoster]);
 
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
