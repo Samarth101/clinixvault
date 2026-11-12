@@ -129,15 +129,14 @@ class DocumentSummarizeRequest(BaseModel):
 
 
 # ==============================================================================
-# ZeroGPU Model Workers
+# ZeroGPU Model Workers (Module Top-Level for Hugging Face ZeroGPU Scanner)
 # ==============================================================================
-@spaces.GPU(duration=120)
-def execute_radiology_vlm_zerogpu(image_base64: Optional[str], projection: str, indication: str):
-    """ZeroGPU function running Vision-Language interpretation on Nvidia A100."""
+def _run_radiology_inference(image_base64: Optional[str], projection: str, indication: str):
+    """Core radiology neural execution logic."""
     time.sleep(0.3)  # Neural pipeline execution simulation on ZeroGPU
     ctr = 0.43
     ctr_status = "NORMAL (<= 0.50)"
-    if "cardiomegaly" in indication.lower() or "heart" in indication.lower():
+    if "cardiomegaly" in (indication or "").lower() or "heart" in (indication or "").lower():
         ctr = 0.56
         ctr_status = "ABNORMAL (> 0.50)"
 
@@ -154,9 +153,27 @@ def execute_radiology_vlm_zerogpu(image_base64: Optional[str], projection: str, 
     return findings, impression, ctr
 
 
-@spaces.GPU(duration=60)
-def execute_patient_avs_zerogpu(clinical_text: str, indication: str):
-    """ZeroGPU function synthesizing plain-language patient report."""
+@spaces.GPU(duration=120)
+def execute_radiology_vlm_zerogpu(image_base64: Optional[str], projection: str, indication: str):
+    """ZeroGPU function running Vision-Language interpretation on Nvidia A100 for REST API."""
+    return _run_radiology_inference(image_base64, projection, indication)
+
+
+@spaces.GPU(duration=120)
+def gradio_radiology_infer(image, proj, ind):
+    """ZeroGPU function connected directly to Gradio UI component."""
+    findings, impression, ctr = _run_radiology_inference(None, proj, ind)
+    return {
+        "findings": findings,
+        "impression": impression,
+        "cardiothoracic_ratio": ctr,
+        "model": "clinixvault-qwen2vl-qlora",
+        "accelerator": "ZeroGPU Nvidia A100",
+    }
+
+
+def _run_patient_avs(clinical_text: str, indication: str):
+    """Core plain-language AVS synthesis logic."""
     time.sleep(0.2)
     return {
         "headline": "Your diagnostic study has been evaluated by our clinical AI; results show stable respiratory condition.",
@@ -190,6 +207,18 @@ def execute_patient_avs_zerogpu(clinical_text: str, indication: str):
         "reading_level": "Grade 6 (Plain Language Certified)",
         "is_insufficient": False,
     }
+
+
+@spaces.GPU(duration=60)
+def execute_patient_avs_zerogpu(clinical_text: str, indication: str):
+    """ZeroGPU function synthesizing plain-language patient report for REST API."""
+    return _run_patient_avs(clinical_text, indication)
+
+
+@spaces.GPU(duration=60)
+def gradio_avs_infer(text):
+    """ZeroGPU function connected directly to Gradio UI component."""
+    return _run_patient_avs(text, "Routine follow-up")
 
 
 # ==============================================================================
@@ -437,21 +466,6 @@ try:
                 ],
                 "priority_tier": "P2 (Colab P1 ➔ HF Spaces P2 ➔ Local Edge P3)"
             }
-
-        @spaces.GPU(duration=120)
-        def gradio_radiology_infer(image, proj, ind):
-            findings, impression, ctr = execute_radiology_vlm_zerogpu(None, proj, ind)
-            return {
-                "findings": findings,
-                "impression": impression,
-                "cardiothoracic_ratio": ctr,
-                "model": "clinixvault-qwen2vl-qlora",
-                "accelerator": "ZeroGPU Nvidia A100",
-            }
-
-        @spaces.GPU(duration=60)
-        def gradio_avs_infer(text):
-            return execute_patient_avs_zerogpu(text, "Routine follow-up")
 
         refresh_btn.click(fn=get_health_status, inputs=[], outputs=[health_output], api_name="health_probe")
         rad_btn.click(fn=gradio_radiology_infer, inputs=[rad_img, rad_proj, rad_ind], outputs=[rad_out], api_name="radiology_vlm")
