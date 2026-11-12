@@ -101,13 +101,18 @@ export const BackendNodeModal: React.FC<BackendNodeModalProps> = ({
 
   const testCustomPing = async () => {
     setCustomPing({ testing: true });
-    const r = await pingSingle(customInputUrl);
+    const clean = customInputUrl.trim().replace(/\/+$/, '');
+    const r = await pingSingle(clean);
     setCustomPing({
       testing: false,
       ok: r.ok,
       latency: r.latency,
       message: r.ok ? `Connected (${r.latency}ms) • ${r.accel}` : `Connection failed: ${r.accel}`,
     });
+    if (r.ok && clean.includes('trycloudflare.com')) {
+      failoverAgent.setColabUrl(clean);
+      setColabPing({ testing: false, ok: true, latency: r.latency, accel: r.accel });
+    }
   };
 
   const handleConnect = (url: string, targetType: 'colab' | 'render' | 'local') => {
@@ -115,7 +120,8 @@ export const BackendNodeModal: React.FC<BackendNodeModalProps> = ({
     if (!clean) return;
 
     if (targetType === 'colab') {
-      failoverAgent.switchToColab('Manual Switch to Colab GPU', clean);
+      failoverAgent.setColabUrl(clean);
+      void failoverAgent.switchToColab('Manual Switch to Colab GPU', clean);
     } else if (targetType === 'render') {
       failoverAgent.switchToRender('Manual Switch to Render Cloud Gateway', clean);
     } else {
@@ -143,10 +149,10 @@ export const BackendNodeModal: React.FC<BackendNodeModalProps> = ({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 10 }}
           transition={{ duration: 0.2 }}
-          className="relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200/80 dark:border-slate-800 p-6 overflow-hidden flex flex-col gap-5 max-h-[92vh] overflow-y-auto"
+          className="relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200/80 dark:border-slate-800 p-6 flex flex-col gap-4 max-h-[92vh] overflow-hidden"
         >
           {/* Header */}
-          <div className="flex items-start justify-between">
+          <div className="flex items-start justify-between shrink-0">
             <div className="flex items-center gap-3">
               <div className="p-2.5 rounded-2xl bg-clinical-blue/10 dark:bg-clinical-blue/20 text-clinical-blue">
                 <Server className="w-5 h-5" />
@@ -185,7 +191,7 @@ export const BackendNodeModal: React.FC<BackendNodeModalProps> = ({
             </button>
           </div>
 
-          <div className="space-y-4">
+          <div className="flex-1 overflow-y-auto space-y-4 pr-1 [scrollbar-width:thin]">
             {/* Active Gateway Bar */}
             <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-800 space-y-1.5">
               <div className="flex items-center justify-between text-xs font-semibold text-slate-600 dark:text-slate-400">
@@ -280,22 +286,59 @@ export const BackendNodeModal: React.FC<BackendNodeModalProps> = ({
                     )}
                   </div>
 
-                  <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px]">
-                    <span className="font-mono text-[10px] text-slate-500">
-                      {colabPing.testing ? 'Pinging...' : colabPing.ok ? `${colabPing.latency}ms • ${colabPing.accel}` : failoverState.colabUrl ? 'Offline / Tunnel closed' : 'Awaiting public tunnel URL'}
-                    </span>
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] gap-2">
                     {failoverState.colabUrl ? (
-                      <button
-                        type="button"
-                        onClick={() => handleConnect(failoverState.colabUrl, 'colab')}
-                        className="px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-bold transition-all cursor-pointer shadow-xs"
-                      >
-                        Use Colab GPU
-                      </button>
+                      <>
+                        <span className="font-mono text-[10px] text-slate-500 truncate max-w-[200px]">
+                          {colabPing.testing ? 'Pinging...' : colabPing.ok ? `${colabPing.latency}ms • ${colabPing.accel}` : 'Offline / Tunnel closed'}
+                        </span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              failoverAgent.setColabUrl('');
+                              setColabPing({ testing: false });
+                            }}
+                            className="px-2 py-1 rounded-lg text-slate-400 hover:text-rose-500 text-[10px] font-semibold transition-colors cursor-pointer"
+                            title="Clear Colab Tunnel"
+                          >
+                            Clear
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleConnect(failoverState.colabUrl, 'colab')}
+                            className={`px-3 py-1 rounded-lg text-white text-[11px] font-bold transition-all cursor-pointer shadow-xs ${
+                              failoverState.activeNode === 'colab'
+                                ? 'bg-emerald-600 hover:bg-emerald-700'
+                                : 'bg-amber-500 hover:bg-amber-600'
+                            }`}
+                          >
+                            {failoverState.activeNode === 'colab' ? 'Active' : 'Use Colab GPU'}
+                          </button>
+                        </div>
+                      </>
                     ) : (
-                      <span className="text-[10px] font-medium text-slate-400 italic">
-                        Paste URL Below ⬇️
-                      </span>
+                      <div className="w-full flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={customInputUrl}
+                          onChange={(e) => setCustomInputUrl(e.target.value)}
+                          placeholder="Paste https://*.trycloudflare.com here..."
+                          className="flex-1 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs font-mono text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const clean = customInputUrl.trim().replace(/\/+$/, '');
+                            if (!clean) return;
+                            handleConnect(clean, 'colab');
+                          }}
+                          className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition-all cursor-pointer whitespace-nowrap shadow-xs flex items-center gap-1"
+                        >
+                          <Zap className="w-3.5 h-3.5" />
+                          <span>Connect</span>
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -417,11 +460,32 @@ export const BackendNodeModal: React.FC<BackendNodeModalProps> = ({
               </div>
 
               {customPing.message && (
-                <div className={`text-[11px] font-mono flex items-center gap-1.5 pt-1 ${
-                  customPing.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500'
-                }`}>
-                  {customPing.ok ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> : <AlertCircle className="w-3.5 h-3.5 text-rose-500" />}
-                  <span>{customPing.message}</span>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between pt-1 gap-2">
+                  <div className={`text-[11px] font-mono flex items-center gap-1.5 ${
+                    customPing.ok ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-rose-500'
+                  }`}>
+                    {customPing.ok ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" /> : <AlertCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />}
+                    <span>{customPing.message}</span>
+                  </div>
+                  {customPing.ok && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const clean = customInputUrl.trim().replace(/\/+$/, '');
+                        if (clean.includes('onrender.com')) {
+                          handleConnect(clean, 'render');
+                        } else if (clean.includes('127.0.0.1') || clean.includes('localhost')) {
+                          handleConnect(clean, 'local');
+                        } else {
+                          handleConnect(clean, 'colab');
+                        }
+                      }}
+                      className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all cursor-pointer shadow-sm flex items-center justify-center gap-1.5 shrink-0"
+                    >
+                      <Zap className="w-3.5 h-3.5 text-amber-300" />
+                      <span>Connect & Activate Node Now</span>
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -467,7 +531,7 @@ export const BackendNodeModal: React.FC<BackendNodeModalProps> = ({
           </div>
 
           {/* Modal Footer */}
-          <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0">
             <button
               onClick={onClose}
               className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
