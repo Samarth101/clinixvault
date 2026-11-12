@@ -7,10 +7,121 @@ and standalone air-gapped workstations.
 import os
 import re
 from typing import Dict, Any, List, Optional, Set
-import networkx as nx
+
+try:
+    import networkx as nx
+except ImportError:
+    nx = None
+
 from inference.shared.logger import get_logger
 
 logger = get_logger("clinixvault.database.neo4j")
+
+
+class _FallbackMultiDiGraph:
+    """Lightweight in-memory property graph used if networkx is not installed."""
+    def __init__(self):
+        self._nodes: Dict[str, Dict[str, Any]] = {}
+        self._adj: Dict[str, Dict[str, Dict[Any, Dict[str, Any]]]] = {}
+        self._pred: Dict[str, Dict[str, Dict[Any, Dict[str, Any]]]] = {}
+
+    def add_node(self, node_for_adding: str, **attr):
+        if node_for_adding not in self._nodes:
+            self._nodes[node_for_adding] = {}
+            self._adj[node_for_adding] = {}
+            self._pred[node_for_adding] = {}
+        self._nodes[node_for_adding].update(attr)
+
+    def has_node(self, n: str) -> bool:
+        return n in self._nodes
+
+    def remove_node(self, n: str):
+        if n in self._nodes:
+            del self._nodes[n]
+            for v in list(self._adj.get(n, {}).keys()):
+                self._pred.get(v, {}).pop(n, None)
+            self._adj.pop(n, None)
+            for u in list(self._pred.get(n, {}).keys()):
+                self._adj.get(u, {}).pop(n, None)
+            self._pred.pop(n, None)
+
+    def add_edge(self, u: str, v: str, key: Any = None, **attr):
+        self.add_node(u)
+        self.add_node(v)
+        k = key if key is not None else 0
+        if v not in self._adj[u]:
+            self._adj[u][v] = {}
+        self._adj[u][v][k] = attr
+        if u not in self._pred[v]:
+            self._pred[v][u] = {}
+        self._pred[v][u][k] = attr
+
+    @property
+    def nodes(self):
+        class _NodeView(dict):
+            def __call__(self, data=False):
+                if data:
+                    return list(self.items())
+                return list(self.keys())
+        return _NodeView(self._nodes)
+
+    def edges(self, keys: bool = True, data: bool = True):
+        res = []
+        for u, nbrs in self._adj.items():
+            for v, keydict in nbrs.items():
+                for k, dat in keydict.items():
+                    if keys and data:
+                        res.append((u, v, k, dat))
+                    elif keys:
+                        res.append((u, v, k))
+                    elif data:
+                        res.append((u, v, dat))
+                    else:
+                        res.append((u, v))
+        return res
+
+    def out_edges(self, nbunch: Optional[str] = None, keys: bool = True, data: bool = True):
+        res = []
+        nodes = [nbunch] if nbunch is not None else list(self._nodes.keys())
+        for u in nodes:
+            for v, keydict in self._adj.get(u, {}).items():
+                for k, dat in keydict.items():
+                    if keys and data:
+                        res.append((u, v, k, dat))
+                    elif keys:
+                        res.append((u, v, k))
+                    elif data:
+                        res.append((u, v, dat))
+                    else:
+                        res.append((u, v))
+        return res
+
+    def in_edges(self, nbunch: Optional[str] = None, keys: bool = True, data: bool = True):
+        res = []
+        nodes = [nbunch] if nbunch is not None else list(self._nodes.keys())
+        for v in nodes:
+            for u, keydict in self._pred.get(v, {}).items():
+                for k, dat in keydict.items():
+                    if keys and data:
+                        res.append((u, v, k, dat))
+                    elif keys:
+                        res.append((u, v, k))
+                    elif data:
+                        res.append((u, v, dat))
+                    else:
+                        res.append((u, v))
+        return res
+
+    def number_of_nodes(self) -> int:
+        return len(self._nodes)
+
+    def number_of_edges(self) -> int:
+        return sum(len(kd) for nbrs in self._adj.values() for kd in nbrs.values())
+
+    def clear(self):
+        self._nodes.clear()
+        self._adj.clear()
+        self._pred.clear()
 
 
 class Neo4jGraphManager:
@@ -30,7 +141,7 @@ class Neo4jGraphManager:
         self.password = password or os.getenv("NEO4J_PASSWORD", "clinixvault2026")
         self._driver = None
         self._is_connected = False
-        self._memory_graph = nx.MultiDiGraph()
+        self._memory_graph = nx.MultiDiGraph() if nx is not None else _FallbackMultiDiGraph()
         self._node_labels: Dict[str, str] = {}
         self._sqlite_path = (
             os.getenv("GRAPH_SQLITE_PATH")
