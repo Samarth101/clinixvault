@@ -241,9 +241,16 @@ async def scribe_websocket_stream(websocket: WebSocket):
                             )
                             if os.path.exists(tf.name):
                                 os.remove(tf.name)
-                            for s in segs:
+                            if segs:
+                                for s in segs:
+                                    s_txt = s.get("text", "").strip()
+                                    if s_txt:
+                                        transcript_accumulator.append(
+                                            {"speaker": s.get("speaker", active_speaker), "text": s_txt}
+                                        )
+                            elif full_txt and full_txt.strip():
                                 transcript_accumulator.append(
-                                    {"speaker": s.get("speaker", active_speaker), "text": s.get("text", "")}
+                                    {"speaker": active_speaker, "text": full_txt.strip()}
                                 )
                         except Exception as audio_err:
                             logger.warning(f"Audio buffer transcription during finalize failed: {audio_err}")
@@ -461,16 +468,20 @@ async def scribe_websocket_stream(websocket: WebSocket):
         logger.info("Ambient scribe WebSocket client disconnected cleanly.")
     except RuntimeError as re:
         err_msg = str(re).lower()
-        if "disconnect message has been received" in err_msg or "cannot call \"receive\"" in err_msg or "websocket.close" in err_msg:
+        if any(cue in err_msg for cue in ("disconnect", "cannot call \"receive\"", "cannot call \"send\"", "close message", "closed", "broken pipe")):
             logger.info("Ambient scribe WebSocket connection closed.")
         else:
             logger.error(f"Scribe WebSocket runtime error: {re}")
     except Exception as e:
-        logger.error(f"Scribe WebSocket processing error: {e}")
+        err_msg = str(e).lower()
+        if any(cue in err_msg for cue in ("disconnect", "connectionclosed", "closed", "broken pipe")):
+            logger.info("Ambient scribe WebSocket connection closed.")
+        else:
+            logger.error(f"Scribe WebSocket processing error: {e}")
         try:
             await websocket.close()
-        except Exception as close_err:
-            logger.debug(f"Scribe websocket close exception: {close_err}")
+        except Exception:
+            pass
 
 
 # ============================================================================

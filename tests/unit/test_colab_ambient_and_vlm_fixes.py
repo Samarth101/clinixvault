@@ -250,3 +250,93 @@ def test_scribe_finalize_with_unregistered_patient(gateway_client):
         assert "SOAP" in soap_rep.title
     finally:
         db.close()
+
+
+def test_radiology_case_upload_with_long_adhoc_patient_persists(gateway_client, auth_headers):
+    """
+    Verifies that uploading a study via POST /api/v1/radiology/cases/upload with a patient ID
+    exceeding 36 characters dynamically provisions patient and encounter without PostgreSQL truncation
+    or foreign key constraint failure.
+    """
+    long_patient_id = f"UPLOAD-PT-{uuid.uuid4().hex[:16].upper()}-EXTENDED-RAD-9999"
+    img_bytes = io.BytesIO()
+    Image.new("RGB", (64, 64), color="blue").save(img_bytes, format="PNG")
+    img_bytes.seek(0)
+
+    files = {
+        "file": ("test_study.png", img_bytes.getvalue(), "image/png"),
+    }
+    data = {
+        "patient_name": "Liam Smith",
+        "patient_id": long_patient_id,
+        "projection": "PA",
+        "clinical_indication": "Follow-up evaluation for cough",
+    }
+
+    resp = gateway_client.post("/api/v1/radiology/upload", data=data, files=files, headers=auth_headers)
+    assert resp.status_code == 200
+    res_data = resp.json()
+    assert res_data["status"] == "success"
+    assert "case" in res_data
+
+    # Verify patient and encounter exist in DB
+    db = SessionLocal()
+    try:
+        pt = db.query(Patient).filter(
+            (Patient.id == long_patient_id[:36]) | (Patient.mrn == long_patient_id[:64])
+        ).first()
+        assert pt is not None
+
+        enc = db.query(Encounter).filter(Encounter.id == res_data["case"]["encounter_id"]).first()
+        assert enc is not None
+        assert enc.patient_id == pt.id
+    finally:
+        db.close()
+
+
+def test_whisper_transcriber_fallback_preserves_offline_model(tmp_path):
+    """
+    Verifies that when CUDA cuBLAS fails, the transcriber attempts to retain the already-cached
+    model_size on CPU int8 first before falling back to small.en, avoiding unnecessary downloads.
+    """
+    transcriber = WhisperTranscriber.__new__(WhisperTranscriber)
+    transcriber.model_size = "large-v3-turbo"
+    transcriber.device = "cuda"
+    transcriber.compute_type = "float16"
+    transcriber.is_loaded = True
+
+    dummy_wav = tmp_path / "test_offline.wav"
+    dummy_wav.write_bytes(b"RIFF" + b"\x00" * 36)
+
+    cuda_mock = MagicMock()
+    cuda_mock.transcribe.side_effect = RuntimeError("Library libcublas.so.12 is not found or cannot be loaded")
+    transcriber.model = cuda_mock
+
+    created_models = []
+    def mock_whisper_init(model_size, device, compute_type, cpu_threads):
+        m = MagicMock()
+        mock_seg = MagicMock()
+        mock_seg.no_speech_prob = 0.01
+        mock_seg.avg_logprob = -0.1
+        mock_seg.text = "Patient demonstrates regular cardiac rate and rhythm."
+        mock_seg.start = 0.0
+        mock_seg.end = 2.0
+        mock_seg.words = []
+        mock_info = MagicMock()
+        mock_info.duration = 2.0
+        mock_info.language = "en"
+        m.transcribe.return_value = ([mock_seg], mock_info)
+        created_models.append((model_size, device, compute_type))
+        return m
+
+    with patch("faster_whisper.WhisperModel", side_effect=mock_whisper_init):
+        full_text, segments, duration, lang = transcriber.transcribe_file(str(dummy_wav))
+
+    assert "regular cardiac rate" in full_text
+    # Should have tried large-v3-turbo on CPU int8 first
+    assert len(created_models) >= 1
+    assert created_models[0][0] == "large-v3-turbo"
+    assert created_models[0][1] == "cpu"
+    assert created_models[0][2] == "int8"
+    assert transcriber.device == "cpu"
+

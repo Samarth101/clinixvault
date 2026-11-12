@@ -20,7 +20,13 @@ echo -e "${CYAN}================================================================
 echo -e "\n${GREEN}[1/2] Setting up PostgreSQL on Colab (port 5432)...${RESET}"
 if ! command -v psql &>/dev/null; then
     apt-get update -qq
-    apt-get install -y -qq postgresql postgresql-contrib postgresql-16-pgvector 2>/dev/null || apt-get install -y -qq postgresql postgresql-contrib
+    apt-get install -y -qq postgresql postgresql-contrib 2>/dev/null || true
+fi
+
+# Ensure pgvector is installed for active PostgreSQL version
+PG_VER=$(psql --version 2>/dev/null | awk '{print $3}' | cut -d. -f1 || echo "")
+if [ -n "$PG_VER" ]; then
+    apt-get install -y -qq "postgresql-${PG_VER}-pgvector" 2>/dev/null || apt-get install -y -qq postgresql-16-pgvector postgresql-14-pgvector 2>/dev/null || true
 fi
 
 # Ensure service is running
@@ -30,6 +36,7 @@ service postgresql start || /etc/init.d/postgresql start
 sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD 'postgres';" >/dev/null 2>&1 || true
 sudo -u postgres createdb clinixvault 2>/dev/null || sudo -u postgres psql -c "CREATE DATABASE clinixvault;" >/dev/null 2>&1 || true
 sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE clinixvault TO postgres;" >/dev/null 2>&1 || true
+sudo -u postgres psql -d clinixvault -c "CREATE EXTENSION IF NOT EXISTS vector;" >/dev/null 2>&1 || true
 
 # Test connectivity
 if PGPASSWORD=postgres psql -U postgres -h 127.0.0.1 -d clinixvault -c "SELECT 1" >/dev/null 2>&1; then

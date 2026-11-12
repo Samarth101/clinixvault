@@ -1280,37 +1280,10 @@ async def upload_radiology_study(
     except Exception as e:
         logger.warning(f"Upload thumbnail encoding note: {e}")
 
-    # Register in DB
-    existing_patient = db.query(Patient).filter((Patient.id == pid) | (Patient.mrn == pid)).first()
-    if not existing_patient:
-        name_parts = pname.split()
-        first_n = name_parts[0] if name_parts else "Uploaded"
-        last_n = " ".join(name_parts[1:]) if len(name_parts) > 1 else "Patient"
-        new_patient = Patient(
-            id=pid,
-            mrn=f"MRN-{pid}"[:60],
-            first_name=first_n,
-            last_name=last_n,
-        )
-        db.add(new_patient)
-        try:
-            db.commit()
-        except Exception:
-            db.rollback()
-
-    # Create new encounter
+    # Register in DB with strict relational foreign key guarantees
+    pt = ensure_patient_exists(db, pid)
     enc_id = f"ENC-RAD-{uuid.uuid4().hex[:6].upper()}"
-    new_encounter = Encounter(
-        id=enc_id,
-        patient_id=pid,
-        encounter_type="radiology",
-        status="in-progress",
-    )
-    db.add(new_encounter)
-    try:
-        db.commit()
-    except Exception:
-        db.rollback()
+    ensure_encounter_exists(db, enc_id, pt.id)
 
     case_id = f"UPLOAD-{pid}"
     return {

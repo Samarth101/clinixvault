@@ -48,29 +48,39 @@ def configure_cuda_cublas_libraries():
 
     discovered_dirs = []
 
-    # 1. Discover via installed nvidia wheels
+    # 1. Discover via installed nvidia wheels and submodules
     nvidia_modules = [
+        "nvidia.cublas.lib",
+        "nvidia.cudnn.lib",
         "nvidia.cublas",
         "nvidia.cudnn",
+        "nvidia.cuda_runtime.lib",
         "nvidia.cuda_runtime",
         "nvidia.cuda_nvrtc",
     ]
     for mod_name in nvidia_modules:
         try:
-            mod = __import__(mod_name, fromlist=["__file__"])
+            mod = __import__(mod_name, fromlist=["__file__", "__path__"])
             if hasattr(mod, "__file__") and mod.__file__:
-                lib_dir = os.path.join(os.path.dirname(mod.__file__), "lib")
-                if os.path.isdir(lib_dir):
-                    discovered_dirs.append(lib_dir)
+                f_dir = os.path.dirname(mod.__file__)
+                discovered_dirs.append(f_dir)
+                discovered_dirs.append(os.path.join(f_dir, "lib"))
+            if hasattr(mod, "__path__"):
+                for p in mod.__path__:
+                    discovered_dirs.append(p)
+                    discovered_dirs.append(os.path.join(p, "lib"))
         except Exception:
             pass
 
-    # 2. Discover via site-packages
+    # 2. Discover via site-packages and sys.path
     try:
         import site
         s_dirs = list(site.getsitepackages()) if hasattr(site, "getsitepackages") else []
         if hasattr(site, "getusersitepackages"):
             s_dirs.append(site.getusersitepackages())
+        for p in sys.path:
+            if p and ("site-packages" in p or "dist-packages" in p):
+                s_dirs.append(p)
         for sd in s_dirs:
             discovered_dirs.extend(glob.glob(os.path.join(sd, "nvidia", "*", "lib")))
             discovered_dirs.extend(glob.glob(os.path.join(sd, "torch", "lib")))
@@ -96,7 +106,7 @@ def configure_cuda_cublas_libraries():
         os.environ["LD_LIBRARY_PATH"] = new_ld
 
     # 4. Explicitly preload key shared libraries into the process with RTLD_GLOBAL
-    # (Note: libcublas requires libcublasLt, so preload libcublasLt FIRST)
+    # Order: CUDA runtime -> cuBLAS Lt -> cuBLAS -> cuDNN ops/cnn -> cuDNN
     shared_libs = [
         "libcudart.so.12",
         "libcudart.so.11",
@@ -104,7 +114,12 @@ def configure_cuda_cublas_libraries():
         "libcublas.so.12",
         "libcublasLt.so.11",
         "libcublas.so.11",
+        "libcudnn_ops_infer.so.9",
+        "libcudnn_cnn_infer.so.9",
+        "libcudnn_adv_infer.so.9",
         "libcudnn.so.9",
+        "libcudnn_ops_infer.so.8",
+        "libcudnn_cnn_infer.so.8",
         "libcudnn.so.8",
     ]
 
@@ -124,6 +139,16 @@ def configure_cuda_cublas_libraries():
                 ctypes.CDLL(lib_name, mode=ctypes.RTLD_GLOBAL)
             except Exception:
                 pass
+
+    # Glob fallback for any versioned libcublas / libcudnn in valid dirs
+    for prefix in ("libcublasLt.so", "libcublas.so", "libcudnn.so"):
+        for dir_path in valid_dirs:
+            matches = glob.glob(os.path.join(dir_path, f"{prefix}*"))
+            for m in sorted(matches, key=len):
+                try:
+                    ctypes.CDLL(m, mode=ctypes.RTLD_GLOBAL)
+                except Exception:
+                    pass
 
 
 # Execute CUDA library setup at module load
@@ -368,14 +393,24 @@ class WhisperTranscriber:
                         from faster_whisper import WhisperModel
                         self.device = "cpu"
                         self.compute_type = "int8"
-                        cpu_size = "small.en" if "large" in self.model_size.lower() else self.model_size
-                        self.model = WhisperModel(
-                            cpu_size,
-                            device="cpu",
-                            compute_type="int8",
-                            cpu_threads=max(2, min(4, os.cpu_count() or 2)),
-                        )
-                        self.model_size = cpu_size
+                        cpu_threads = max(2, min(4, os.cpu_count() or 2))
+                        # Try existing model first to prevent fresh network download
+                        try:
+                            self.model = WhisperModel(
+                                self.model_size,
+                                device="cpu",
+                                compute_type="int8",
+                                cpu_threads=cpu_threads,
+                            )
+                        except Exception:
+                            cpu_size = "small.en" if "large" in self.model_size.lower() else self.model_size
+                            self.model = WhisperModel(
+                                cpu_size,
+                                device="cpu",
+                                compute_type="int8",
+                                cpu_threads=cpu_threads,
+                            )
+                            self.model_size = cpu_size
                         results, full_parts, info = _parse_and_collect_segments(self.model)
                     except Exception as fallback_err:
                         logger.warning(f"Audio transcription CPU fallback execution failed ({fallback_err}). Returning empty transcription.")

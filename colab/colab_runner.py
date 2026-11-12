@@ -518,7 +518,6 @@ def ensure_cuda_and_vlm_dependencies():
     - nvidia-cublas-cu12, nvidia-cudnn-cu12 (for faster-whisper CTranslate2 CUDA runtime)
     Also ensures dynamic linker discovery and preloading of cuBLAS libraries.
     """
-    is_colab = os.path.exists("/content") or "COLAB_GPU" in os.environ
     to_install = []
 
     try:
@@ -526,15 +525,16 @@ def ensure_cuda_and_vlm_dependencies():
     except ImportError:
         to_install.append("qwen-vl-utils>=0.0.8")
 
+    needs_reexec = False
     try:
         import torch
-        if torch.cuda.is_available() and is_colab:
+        if torch.cuda.is_available() and sys.platform == "linux":
             try:
-                import nvidia.cublas
+                import nvidia.cublas.lib
             except ImportError:
                 to_install.append("nvidia-cublas-cu12")
             try:
-                import nvidia.cudnn
+                import nvidia.cudnn.lib
             except ImportError:
                 to_install.append("nvidia-cudnn-cu12")
     except Exception:
@@ -548,6 +548,7 @@ def ensure_cuda_and_vlm_dependencies():
                 check=False,
             )
             print(f"{GREEN}✓ Colab runtime dependencies installed successfully.{RESET}")
+            needs_reexec = True
         except Exception as e:
             print(f"{YELLOW}⚠️ Dependency install note: {e}{RESET}")
 
@@ -557,6 +558,17 @@ def ensure_cuda_and_vlm_dependencies():
         configure_cuda_cublas_libraries()
     except Exception:
         pass
+
+    # In Linux glibc, ld.so reads LD_LIBRARY_PATH once at process startup.
+    # If dependencies were just installed or LD_LIBRARY_PATH was empty, re-exec once
+    # so CTranslate2's dlopen has LD_LIBRARY_PATH baked into the process from execve().
+    if sys.platform == "linux" and needs_reexec and os.environ.get("_CLINIX_REEXEC") != "1":
+        os.environ["_CLINIX_REEXEC"] = "1"
+        try:
+            print(f"{GREEN}⚡ Re-executing runner with configured CUDA LD_LIBRARY_PATH...{RESET}")
+            os.execv(sys.executable, [sys.executable] + sys.argv)
+        except Exception:
+            pass
 
 
 # ============================================================================
