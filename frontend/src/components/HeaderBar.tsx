@@ -17,7 +17,9 @@ import {
   Cloud,
   Lock,
   RefreshCw,
-  WifiOff
+  WifiOff,
+  Zap,
+  Globe
 } from 'lucide-react';
 import { useAuth } from '../context/useAuth';
 import { useVaultLock } from '../context/VaultLockContext';
@@ -130,6 +132,8 @@ export const HeaderBar: React.FC<HeaderBarProps> = React.memo(({
   };
 
   const isColabActive = failoverState.activeNode === 'colab';
+  const isHfActive = failoverState.activeNode === 'hf_spaces';
+  const isRenderActive = failoverState.activeNode === 'render';
   const isLocalActive = failoverState.activeNode === 'local';
   const isOffline = failoverState.activeNode === 'offline';
 
@@ -318,6 +322,10 @@ export const HeaderBar: React.FC<HeaderBarProps> = React.memo(({
           className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-xl border text-[11px] font-semibold shadow-xs transition-all cursor-pointer shrink-0 ${
             isColabActive
               ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-200 border-amber-500/30'
+              : isHfActive
+              ? 'bg-purple-500/10 hover:bg-purple-500/20 text-purple-800 dark:text-purple-200 border-purple-500/30'
+              : isRenderActive
+              ? 'bg-sky-500/10 hover:bg-sky-500/20 text-sky-800 dark:text-sky-200 border-sky-500/30'
               : isLocalActive
               ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-800 dark:text-emerald-200 border-emerald-500/30'
               : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-800 dark:text-rose-200 border-rose-500/30'
@@ -326,21 +334,25 @@ export const HeaderBar: React.FC<HeaderBarProps> = React.memo(({
         >
           <span className="relative flex h-2 w-2 shrink-0">
             <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-              isColabActive ? 'bg-amber-400' : isLocalActive ? 'bg-emerald-400' : 'bg-rose-400'
+              isColabActive ? 'bg-amber-400' : isHfActive ? 'bg-purple-400' : isRenderActive ? 'bg-sky-400' : isLocalActive ? 'bg-emerald-400' : 'bg-rose-400'
             }`}></span>
             <span className={`relative inline-flex rounded-full h-2 w-2 ${
-              isColabActive ? 'bg-amber-500' : isLocalActive ? 'bg-emerald-500' : 'bg-rose-500'
+              isColabActive ? 'bg-amber-500' : isHfActive ? 'bg-purple-500' : isRenderActive ? 'bg-sky-500' : isLocalActive ? 'bg-emerald-500' : 'bg-rose-500'
             }`}></span>
           </span>
           {isColabActive ? (
             <Cloud className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+          ) : isHfActive ? (
+            <Zap className="w-3.5 h-3.5 text-purple-500 shrink-0" />
+          ) : isRenderActive ? (
+            <Globe className="w-3.5 h-3.5 text-sky-500 shrink-0" />
           ) : isLocalActive ? (
             <Server className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
           ) : (
             <WifiOff className="w-3.5 h-3.5 text-rose-500 shrink-0" />
           )}
           <span className="font-extrabold text-[10px] sm:text-[11px] whitespace-nowrap">
-            {isColabActive ? 'Colab GPU' : isLocalActive ? 'Local Node' : 'Offline'}
+            {isColabActive ? 'Colab GPU' : isHfActive ? 'HF Spaces' : isRenderActive ? 'Render Cloud' : isLocalActive ? 'Local Node' : 'Offline'}
           </span>
           {failoverState.latencyMs > 0 && !isOffline && (
             <span className="hidden sm:inline font-mono text-[9px] opacity-80">

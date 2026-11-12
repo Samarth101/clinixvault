@@ -12,7 +12,11 @@ import {
   X,
   Copy,
   Check,
-  Activity
+  Globe,
+  Sparkles,
+  Layers,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { getApiBaseUrl, setApiBaseUrl } from '../services/api';
 import { failoverAgent, FailoverState } from '../services/nodeFailoverAgent';
@@ -23,8 +27,10 @@ interface BackendNodeModalProps {
   onConnected?: (url: string) => void;
 }
 
-const ACTIVE_COLAB_URL = 'https://barry-cake-sugar-elizabeth.trycloudflare.com';
-const LOCAL_NODE_URL = 'http://127.0.0.1:8000';
+const DEFAULT_COLAB_URL = 'https://barry-cake-sugar-elizabeth.trycloudflare.com';
+const DEFAULT_HF_SPACES_URL = 'https://clinixvault-inference.hf.space';
+const DEFAULT_RENDER_URL = 'https://clinixvault-backend.onrender.com';
+const DEFAULT_LOCAL_URL = 'http://127.0.0.1:8000';
 
 export const BackendNodeModal: React.FC<BackendNodeModalProps> = ({
   isOpen,
@@ -33,16 +39,18 @@ export const BackendNodeModal: React.FC<BackendNodeModalProps> = ({
 }) => {
   const [failoverState, setFailoverState] = useState<FailoverState>(() => failoverAgent.getState());
   const [currentUrl, setCurrentUrl] = useState<string>(() => getApiBaseUrl());
-  const [inputUrl, setInputUrl] = useState<string>(() => getApiBaseUrl());
-  const [pingStatus, setPingStatus] = useState<{
-    testing: boolean;
-    success?: boolean;
-    latencyMs?: number;
-    message?: string;
-    details?: any;
-  }>({ testing: false });
+  const [customInputUrl, setCustomInputUrl] = useState<string>(() => getApiBaseUrl());
   const [copied, setCopied] = useState(false);
   const [showHeartbeatLogs, setShowHeartbeatLogs] = useState(false);
+
+  // Per-node ping states
+  const [colabPing, setColabPing] = useState<{ testing: boolean; latency?: number; ok?: boolean; accel?: string }>({ testing: false });
+  const [hfPing, setHfPing] = useState<{ testing: boolean; latency?: number; ok?: boolean; accel?: string }>({ testing: false });
+  const [renderPing, setRenderPing] = useState<{ testing: boolean; latency?: number; ok?: boolean; accel?: string }>({ testing: false });
+  const [localPing, setLocalPing] = useState<{ testing: boolean; latency?: number; ok?: boolean; accel?: string }>({ testing: false });
+
+  // Custom ping
+  const [customPing, setCustomPing] = useState<{ testing: boolean; latency?: number; ok?: boolean; message?: string }>({ testing: false });
 
   useEffect(() => {
     const unsub = failoverAgent.subscribe((state) => {
@@ -56,18 +64,14 @@ export const BackendNodeModal: React.FC<BackendNodeModalProps> = ({
     if (isOpen) {
       const active = getApiBaseUrl();
       setCurrentUrl(active);
-      setInputUrl(active);
-      void testPing(active);
+      setCustomInputUrl(active);
+      void pingAllNodes();
     }
   }, [isOpen]);
 
-  const testPing = async (urlToTest: string) => {
-    const target = (urlToTest || '').trim().replace(/\/+$/, '');
-    if (!target) {
-      setPingStatus({ testing: false, success: false, message: 'URL cannot be empty' });
-      return;
-    }
-    setPingStatus({ testing: true });
+  const pingSingle = async (url: string) => {
+    const target = (url || '').trim().replace(/\/+$/, '');
+    if (!target) return { ok: false, latency: 0, accel: 'No URL' };
     const t0 = performance.now();
     try {
       const res = await fetch(`${target}/api/v1/health`, {
@@ -76,39 +80,53 @@ export const BackendNodeModal: React.FC<BackendNodeModalProps> = ({
       const latency = Math.round(performance.now() - t0);
       if (res.ok) {
         const data = await res.json();
-        const accel = data?.telemetry?.accelerator || data?.hardware?.accelerator || 'Online';
-        setPingStatus({
-          testing: false,
-          success: true,
-          latencyMs: latency,
-          message: `Connected (${latency}ms) • ${accel}`,
-          details: data,
-        });
-      } else {
-        setPingStatus({
-          testing: false,
-          success: false,
-          message: `Gateway responded with HTTP ${res.status}`,
-        });
+        const accel = data?.telemetry?.accelerator || data?.hardware?.accelerator || (target.includes('hf.space') ? 'ZeroGPU A100' : 'Online');
+        return { ok: true, latency, accel };
       }
-    } catch (err: any) {
-      setPingStatus({
-        testing: false,
-        success: false,
-        message: err?.message || 'Connection refused or tunnel offline',
-      });
+      return { ok: false, latency, accel: `HTTP ${res.status}` };
+    } catch {
+      return { ok: false, latency: 0, accel: 'Unreachable' };
     }
   };
 
-  const handleApply = (url: string) => {
+  const pingAllNodes = async () => {
+    setColabPing({ testing: true });
+    setHfPing({ testing: true });
+    setRenderPing({ testing: true });
+    setLocalPing({ testing: true });
+
+    void pingSingle(failoverState.colabUrl).then((r) => setColabPing({ testing: false, ok: r.ok, latency: r.latency, accel: r.accel }));
+    void pingSingle(failoverState.hfSpacesUrl).then((r) => setHfPing({ testing: false, ok: r.ok, latency: r.latency, accel: r.accel }));
+    void pingSingle(failoverState.renderUrl).then((r) => setRenderPing({ testing: false, ok: r.ok, latency: r.latency, accel: r.accel }));
+    void pingSingle(failoverState.localUrl).then((r) => setLocalPing({ testing: false, ok: r.ok, latency: r.latency, accel: r.accel }));
+  };
+
+  const testCustomPing = async () => {
+    setCustomPing({ testing: true });
+    const r = await pingSingle(customInputUrl);
+    setCustomPing({
+      testing: false,
+      ok: r.ok,
+      latency: r.latency,
+      message: r.ok ? `Connected (${r.latency}ms) • ${r.accel}` : `Connection failed: ${r.accel}`,
+    });
+  };
+
+  const handleConnect = (url: string, targetType: 'colab' | 'hf_spaces' | 'render' | 'local') => {
     const clean = url.trim().replace(/\/+$/, '');
-    setApiBaseUrl(clean);
-    setCurrentUrl(clean);
-    if (clean.includes('127.0.0.1') || clean.includes('localhost')) {
-      failoverAgent.setLocalUrl(clean);
+    if (!clean) return;
+
+    if (targetType === 'colab') {
+      failoverAgent.switchToColab('Manual Switch to Colab GPU', clean);
+    } else if (targetType === 'hf_spaces') {
+      failoverAgent.switchToHfSpaces('Manual Switch to HF Spaces ZeroGPU', clean);
+    } else if (targetType === 'render') {
+      failoverAgent.switchToRender('Manual Switch to Render Cloud Gateway', clean);
     } else {
-      failoverAgent.setColabUrl(clean);
+      failoverAgent.switchToLocal('Manual Switch to Local Edge Node');
     }
+
+    setCurrentUrl(clean);
     onConnected?.(clean);
     onClose();
   };
@@ -121,40 +139,45 @@ export const BackendNodeModal: React.FC<BackendNodeModalProps> = ({
 
   if (!isOpen) return null;
 
-  const isColabActive = currentUrl.includes('trycloudflare.com') || currentUrl.includes('colab');
-
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md overflow-y-auto">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md">
         <motion.div
-          initial={{ opacity: 0, scale: 0.94, y: 15 }}
+          initial={{ opacity: 0, scale: 0.95, y: 16 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.94, y: 15 }}
-          className="relative w-full max-w-xl bg-white dark:bg-slate-900 rounded-[28px] border border-slate-200/80 dark:border-slate-800 shadow-2xl p-6 sm:p-7 text-slate-800 dark:text-slate-100 overflow-hidden my-8"
+          exit={{ opacity: 0, scale: 0.95, y: 16 }}
+          transition={{ duration: 0.22, ease: "easeOut" }}
+          className="relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/90 dark:border-slate-800 shadow-2xl p-6 sm:p-7 overflow-hidden"
         >
-          {/* Top Bar */}
-          <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
+          {/* Header */}
+          <div className="flex items-start justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
             <div className="flex items-center gap-3">
-              <div className={`w-11 h-11 rounded-2xl flex items-center justify-center ${
-                isColabActive ? 'bg-amber-500/10 text-amber-500' : 'bg-emerald-500/10 text-emerald-600'
-              }`}>
-                {isColabActive ? <Cloud className="w-5 h-5" /> : <Server className="w-5 h-5" />}
+              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20">
+                <Layers className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                  <span>Dual-Node Backend Telemetry</span>
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+                <h3 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
+                  <span>Multi-Provider Inference & Deployment Manager</span>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                     failoverState.activeNode === 'colab'
-                      ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
+                      ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
+                      : failoverState.activeNode === 'hf_spaces'
+                      ? 'bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300'
+                      : failoverState.activeNode === 'render'
+                      ? 'bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300'
                       : failoverState.activeNode === 'local'
-                      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
-                      : 'bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
+                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                      : 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
                   }`}>
-                    {failoverState.activeNode === 'colab' ? 'COLAB GPU ONLINE' : failoverState.activeNode === 'local' ? 'LOCAL EDGE ACTIVE' : 'OFFLINE'}
+                    {failoverState.activeNode === 'colab' && 'COLAB GPU ACTIVE'}
+                    {failoverState.activeNode === 'hf_spaces' && 'HF SPACES ACTIVE'}
+                    {failoverState.activeNode === 'render' && 'RENDER CLOUD ACTIVE'}
+                    {failoverState.activeNode === 'local' && 'LOCAL EDGE ACTIVE'}
+                    {failoverState.activeNode === 'offline' && 'ALL NODES OFFLINE'}
                   </span>
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Automated failover between Google Colab GPU cloud tunnel and local edge inference.
+                  Automated seamless failover priority: <strong className="text-slate-700 dark:text-slate-200">Colab (P1) → HF Spaces (P2) → Local Edge (P3)</strong>
                 </p>
               </div>
             </div>
@@ -166,9 +189,9 @@ export const BackendNodeModal: React.FC<BackendNodeModalProps> = ({
             </button>
           </div>
 
-          <div className="py-4 space-y-4 max-h-[70vh] overflow-y-auto pr-1">
-            {/* Current Active Connection Status Card */}
-            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 space-y-2">
+          <div className="py-4 space-y-4 max-h-[72vh] overflow-y-auto pr-1 scrollbar-thin">
+            {/* Active Endpoint HUD Card */}
+            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 space-y-2">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
                   Active Gateway Endpoint
@@ -183,52 +206,27 @@ export const BackendNodeModal: React.FC<BackendNodeModalProps> = ({
               </div>
               <div className="font-mono text-xs text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 break-all select-all flex items-center justify-between">
                 <span>{currentUrl}</span>
-                <span className={`ml-2 px-2 py-0.5 text-[10px] rounded font-bold shrink-0 ${
-                  isColabActive ? 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300' : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
-                }`}>
-                  {isColabActive ? 'Colab Cloudflare' : 'Local Edge Node'}
-                </span>
-              </div>
-              {/* Ping output badge */}
-              <div className="flex items-center justify-between pt-1 text-xs">
-                {pingStatus.testing ? (
-                  <span className="flex items-center gap-1.5 text-slate-500 text-[11px] font-mono">
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-clinical-blue" />
-                    Pinging endpoint...
-                  </span>
-                ) : pingStatus.success ? (
-                  <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 text-[11px] font-mono font-semibold">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                    {pingStatus.message}
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1.5 text-rose-600 dark:text-rose-400 text-[11px] font-mono font-semibold">
-                    <AlertCircle className="w-4 h-4 text-rose-500" />
-                    {pingStatus.message}
-                  </span>
-                )}
-
-                <span className="text-[11px] font-mono text-slate-400">
-                  Pulse Latency: {failoverState.latencyMs}ms
+                <span className="ml-2 font-mono text-[10px] text-slate-500 shrink-0">
+                  Latency: {failoverState.latencyMs}ms
                 </span>
               </div>
             </div>
 
-            {/* Automated Failover Control Toggle */}
-            <div className="p-3.5 rounded-2xl bg-blue-50/50 dark:bg-blue-950/30 border border-blue-200/60 dark:border-blue-900/40 flex items-center justify-between">
+            {/* Automated Failover Toggle */}
+            <div className="p-3 rounded-2xl bg-blue-50/50 dark:bg-blue-950/30 border border-blue-200/60 dark:border-blue-900/40 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-xl bg-clinical-blue/10 dark:bg-clinical-blue/20 text-clinical-blue flex items-center justify-center">
                   <Zap className="w-4 h-4" />
                 </div>
                 <div>
                   <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                    <span>Automated Seamless Failover Agent</span>
+                    <span>Tiered Dynamic Failover Agent</span>
                     <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-blue-100 dark:bg-blue-900 text-clinical-blue">
                       Active
                     </span>
                   </div>
                   <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
-                    Triggers local edge fallback if Colab latency &gt;1,200ms or drops 3 heartbeats.
+                    Colab (P1) → HF Spaces ZeroGPU (P2) → Local Edge (P3). Recovers automatically when higher tiers reboot.
                   </div>
                 </div>
               </div>
@@ -240,138 +238,265 @@ export const BackendNodeModal: React.FC<BackendNodeModalProps> = ({
               />
             </div>
 
-            {/* Quick Preset Buttons */}
+            {/* Provider Nodes Cards Matrix */}
             <div className="space-y-2">
-              <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 block">
-                Seamless Dual-Node Selector:
-              </span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 block">
+                  Configured Compute & Gateway Nodes:
+                </span>
                 <button
                   type="button"
-                  onClick={() => {
-                    setInputUrl(LOCAL_NODE_URL);
-                    void testPing(LOCAL_NODE_URL);
-                    void failoverAgent.executeFailoverToLocal('Manual Clinician Node Switch');
-                  }}
-                  className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer flex items-start gap-3 ${
-                    currentUrl === LOCAL_NODE_URL
-                      ? 'bg-emerald-50/90 dark:bg-emerald-950/40 border-emerald-500 shadow-xs'
-                      : 'bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-slate-300'
-                  }`}
+                  onClick={pingAllNodes}
+                  className="text-[11px] text-clinical-blue hover:underline flex items-center gap-1 cursor-pointer font-semibold"
                 >
-                  <Laptop className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
-                  <div>
-                    <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1">
-                      <span>Local Edge Node</span>
-                      {currentUrl === LOCAL_NODE_URL && (
-                        <span className="text-[9px] font-bold text-emerald-600 bg-emerald-100 dark:bg-emerald-900 px-1.5 py-0.2 rounded">
-                          ACTIVE
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-[10px] text-slate-500 font-mono mt-0.5">{LOCAL_NODE_URL}</div>
-                  </div>
+                  <RefreshCw className="w-3 h-3" />
+                  <span>Refresh All Latencies</span>
                 </button>
+              </div>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setInputUrl(ACTIVE_COLAB_URL);
-                    void testPing(ACTIVE_COLAB_URL);
-                    void failoverAgent.switchToColab('Manual Clinician Node Switch', ACTIVE_COLAB_URL);
-                  }}
-                  className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer flex items-start gap-3 ${
-                    currentUrl.includes('trycloudflare.com')
-                      ? 'bg-amber-50/90 dark:bg-amber-950/40 border-amber-500 shadow-xs'
-                      : 'bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-slate-300'
-                  }`}
-                >
-                  <Cloud className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
-                  <div>
-                    <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1">
-                      <span>Colab GPU Cloud Tunnel</span>
-                      {currentUrl.includes('trycloudflare.com') && (
-                        <span className="text-[9px] font-bold text-amber-600 bg-amber-100 dark:bg-amber-900 px-1.5 py-0.2 rounded">
-                          ACTIVE
-                        </span>
-                      )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* 1. Colab GPU Cloud Tunnel (P1) */}
+                <div className={`p-3.5 rounded-2xl border text-left transition-all flex flex-col justify-between gap-3 ${
+                  failoverState.activeNode === 'colab'
+                    ? 'bg-amber-50/90 dark:bg-amber-950/40 border-amber-500 shadow-xs'
+                    : 'bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-slate-300'
+                }`}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 rounded-xl bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-300">
+                        <Cloud className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1">
+                          <span>Colab GPU Tunnel</span>
+                          <span className="text-[9px] font-bold bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300 px-1.5 py-0.2 rounded">
+                            P1 High-Perf
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-slate-500 font-mono truncate max-w-[170px]" title={failoverState.colabUrl}>
+                          {failoverState.colabUrl}
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-[10px] text-slate-500 font-mono mt-0.5 truncate max-w-[180px]">
-                      {ACTIVE_COLAB_URL}
-                    </div>
+                    {failoverState.activeNode === 'colab' && (
+                      <span className="text-[9px] font-black text-amber-600 bg-amber-100 dark:bg-amber-950 px-2 py-0.5 rounded-full uppercase">
+                        Active
+                      </span>
+                    )}
                   </div>
-                </button>
+
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px]">
+                    <span className="font-mono text-[10px] text-slate-500">
+                      {colabPing.testing ? 'Pinging...' : colabPing.ok ? `${colabPing.latency}ms • ${colabPing.accel}` : 'Offline / Standby'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleConnect(failoverState.colabUrl, 'colab')}
+                      className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-bold transition-all cursor-pointer shadow-xs"
+                    >
+                      Use Colab
+                    </button>
+                  </div>
+                </div>
+
+                {/* 2. Hugging Face Spaces GPU Node (P2) */}
+                <div className={`p-3.5 rounded-2xl border text-left transition-all flex flex-col justify-between gap-3 ${
+                  failoverState.activeNode === 'hf_spaces'
+                    ? 'bg-purple-50/90 dark:bg-purple-950/40 border-purple-500 shadow-xs'
+                    : 'bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-slate-300'
+                }`}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 rounded-xl bg-purple-100 dark:bg-purple-900/50 text-purple-600 dark:text-purple-300">
+                        <Sparkles className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1">
+                          <span>HF Spaces ZeroGPU</span>
+                          <span className="text-[9px] font-bold bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300 px-1.5 py-0.2 rounded">
+                            P2 Fallback
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-slate-500 font-mono truncate max-w-[170px]" title={failoverState.hfSpacesUrl}>
+                          {failoverState.hfSpacesUrl}
+                        </div>
+                      </div>
+                    </div>
+                    {failoverState.activeNode === 'hf_spaces' && (
+                      <span className="text-[9px] font-black text-purple-600 bg-purple-100 dark:bg-purple-950 px-2 py-0.5 rounded-full uppercase">
+                        Active
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px]">
+                    <span className="font-mono text-[10px] text-slate-500">
+                      {hfPing.testing ? 'Pinging...' : hfPing.ok ? `${hfPing.latency}ms • ${hfPing.accel}` : 'Sleeping / Standby'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleConnect(failoverState.hfSpacesUrl, 'hf_spaces')}
+                      className="px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-bold transition-all cursor-pointer shadow-xs"
+                    >
+                      Use HF Space
+                    </button>
+                  </div>
+                </div>
+
+                {/* 3. Sovereign Local Edge Node (P3) */}
+                <div className={`p-3.5 rounded-2xl border text-left transition-all flex flex-col justify-between gap-3 ${
+                  failoverState.activeNode === 'local'
+                    ? 'bg-emerald-50/90 dark:bg-emerald-950/40 border-emerald-500 shadow-xs'
+                    : 'bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-slate-300'
+                }`}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-300">
+                        <Laptop className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1">
+                          <span>Local Edge Node</span>
+                          <span className="text-[9px] font-bold bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.2 rounded">
+                            P3 Air-Gapped
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-slate-500 font-mono truncate max-w-[170px]">
+                          {failoverState.localUrl}
+                        </div>
+                      </div>
+                    </div>
+                    {failoverState.activeNode === 'local' && (
+                      <span className="text-[9px] font-black text-emerald-600 bg-emerald-100 dark:bg-emerald-950 px-2 py-0.5 rounded-full uppercase">
+                        Active
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px]">
+                    <span className="font-mono text-[10px] text-slate-500">
+                      {localPing.testing ? 'Pinging...' : localPing.ok ? `${localPing.latency}ms • MPS/CPU` : 'Offline'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleConnect(failoverState.localUrl, 'local')}
+                      className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold transition-all cursor-pointer shadow-xs"
+                    >
+                      Use Local
+                    </button>
+                  </div>
+                </div>
+
+                {/* 4. Render Cloud Gateway */}
+                <div className={`p-3.5 rounded-2xl border text-left transition-all flex flex-col justify-between gap-3 ${
+                  failoverState.activeNode === 'render'
+                    ? 'bg-sky-50/90 dark:bg-sky-950/40 border-sky-500 shadow-xs'
+                    : 'bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-slate-300'
+                }`}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 rounded-xl bg-sky-100 dark:bg-sky-900/50 text-sky-600 dark:text-sky-300">
+                        <Globe className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1">
+                          <span>Render Cloud Gateway</span>
+                          <span className="text-[9px] font-bold bg-sky-100 dark:bg-sky-900/60 text-sky-700 dark:text-sky-300 px-1.5 py-0.2 rounded">
+                            Hosted Gateway
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-slate-500 font-mono truncate max-w-[170px]" title={failoverState.renderUrl}>
+                          {failoverState.renderUrl}
+                        </div>
+                      </div>
+                    </div>
+                    {failoverState.activeNode === 'render' && (
+                      <span className="text-[9px] font-black text-sky-600 bg-sky-100 dark:bg-sky-950 px-2 py-0.5 rounded-full uppercase">
+                        Active
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px]">
+                    <span className="font-mono text-[10px] text-slate-500">
+                      {renderPing.testing ? 'Pinging...' : renderPing.ok ? `${renderPing.latency}ms • Render` : 'Standby / Deploy'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleConnect(failoverState.renderUrl, 'render')}
+                      className="px-2.5 py-1 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-bold transition-all cursor-pointer shadow-xs"
+                    >
+                      Use Render
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Manual URL Input Field */}
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300 block">
-                Paste Custom Remote Backend / Cloudflare URL:
+            {/* Custom URL Input & Ping Tester */}
+            <div className="p-4 rounded-2xl bg-slate-50/80 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 space-y-2">
+              <label className="text-[11px] font-bold text-slate-700 dark:text-slate-200 block">
+                Paste Custom URL / Cloudflare Tunnel / Hugging Face Space:
               </label>
               <div className="flex gap-2">
                 <input
                   type="text"
-                  value={inputUrl}
-                  onChange={(e) => setInputUrl(e.target.value)}
-                  placeholder="https://xxxx.trycloudflare.com"
-                  className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-clinical-blue/50"
+                  value={customInputUrl}
+                  onChange={(e) => setCustomInputUrl(e.target.value)}
+                  placeholder="https://your-space.hf.space or https://*.trycloudflare.com"
+                  className="flex-1 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-clinical-blue"
                 />
                 <button
                   type="button"
-                  onClick={() => testPing(inputUrl)}
-                  disabled={pingStatus.testing}
-                  className="px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1.5 border border-slate-200/70 dark:border-slate-700"
+                  onClick={testCustomPing}
+                  disabled={customPing.testing}
+                  className="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
                 >
-                  <RefreshCw className={`w-3.5 h-3.5 ${pingStatus.testing ? 'animate-spin' : ''}`} />
+                  {customPing.testing ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5 text-amber-500" />}
                   <span>Test Ping</span>
                 </button>
               </div>
+
+              {customPing.message && (
+                <div className={`text-[11px] font-mono flex items-center gap-1.5 pt-1 ${
+                  customPing.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500'
+                }`}>
+                  {customPing.ok ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> : <AlertCircle className="w-3.5 h-3.5 text-rose-500" />}
+                  <span>{customPing.message}</span>
+                </div>
+              )}
             </div>
 
-            {/* Continuous Heartbeat Diagnostics Collapsible */}
+            {/* Live Heartbeat Logs Toggle */}
             <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
               <button
                 type="button"
                 onClick={() => setShowHeartbeatLogs(!showHeartbeatLogs)}
-                className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/40 flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-300 transition-colors"
               >
-                <div className="flex items-center gap-2">
-                  <Activity className="w-3.5 h-3.5 text-clinical-blue" />
-                  <span>Continuous Heartbeat Monitor Logs ({failoverState.recentHeartbeats.length})</span>
-                </div>
-                <span className="text-[10px] text-slate-400 font-mono">
-                  {showHeartbeatLogs ? 'Hide ▲' : 'Show ▼'}
-                </span>
+                <span>Live Continuous Pulse Logs ({failoverState.recentHeartbeats.length})</span>
+                {showHeartbeatLogs ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
               </button>
 
               {showHeartbeatLogs && (
                 <div className="p-3 bg-white dark:bg-slate-900 space-y-1.5 max-h-40 overflow-y-auto font-mono text-[10px]">
                   {failoverState.recentHeartbeats.length === 0 ? (
-                    <div className="text-slate-400 py-2 text-center">No heartbeats logged yet</div>
+                    <div className="text-slate-400 italic">No heartbeats logged yet...</div>
                   ) : (
-                    failoverState.recentHeartbeats.map((hb, i) => (
-                      <div
-                        key={i}
-                        className="flex items-center justify-between py-1 px-2 rounded bg-slate-50 dark:bg-slate-800/50"
-                      >
+                    failoverState.recentHeartbeats.map((log, i) => (
+                      <div key={i} className="flex items-center justify-between py-1 border-b border-slate-100 dark:border-slate-800 last:border-0">
                         <div className="flex items-center gap-2">
-                          <span className={`w-2 h-2 rounded-full ${
-                            hb.status === 'optimal'
-                              ? 'bg-emerald-500'
-                              : hb.status === 'degraded'
-                              ? 'bg-amber-500'
-                              : 'bg-rose-500'
+                          <span className={`w-1.5 h-1.5 rounded-full ${
+                            log.status === 'optimal' ? 'bg-emerald-500' : log.status === 'degraded' ? 'bg-amber-500' : 'bg-rose-500'
                           }`} />
-                          <span className="font-bold uppercase text-slate-700 dark:text-slate-300">
-                            {hb.node}
-                          </span>
-                          <span className="text-slate-400 truncate max-w-[180px]">{hb.url}</span>
+                          <span className="uppercase font-bold text-slate-600 dark:text-slate-400">[{log.node}]</span>
+                          <span className="text-slate-500 truncate max-w-[200px]">{log.url}</span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-600 dark:text-slate-400">{hb.latencyMs}ms</span>
-                          <span className="text-[9px] text-slate-400">
-                            {new Date(hb.timestamp).toLocaleTimeString()}
+                        <div className="text-right">
+                          <span className={`font-bold ${
+                            log.latencyMs > 1200 ? 'text-amber-600' : 'text-emerald-600'
+                          }`}>
+                            {log.latencyMs}ms
                           </span>
                         </div>
                       </div>
@@ -382,8 +507,8 @@ export const BackendNodeModal: React.FC<BackendNodeModalProps> = ({
             </div>
           </div>
 
-          {/* Footer Controls */}
-          <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800">
+          {/* Modal Footer */}
+          <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
             <button
               onClick={onClose}
               className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
@@ -391,11 +516,22 @@ export const BackendNodeModal: React.FC<BackendNodeModalProps> = ({
               Cancel
             </button>
             <button
-              onClick={() => handleApply(inputUrl)}
-              className="px-5 py-2.5 rounded-xl bg-clinical-blue hover:bg-blue-700 text-white text-xs font-bold shadow-sm transition-all cursor-pointer flex items-center gap-2"
+              onClick={() => {
+                const clean = customInputUrl.trim().replace(/\/+$/, '');
+                if (clean.includes('hf.space')) {
+                  handleConnect(clean, 'hf_spaces');
+                } else if (clean.includes('onrender.com')) {
+                  handleConnect(clean, 'render');
+                } else if (clean.includes('127.0.0.1') || clean.includes('localhost')) {
+                  handleConnect(clean, 'local');
+                } else {
+                  handleConnect(clean, 'colab');
+                }
+              }}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-clinical-blue hover:bg-blue-600 text-white text-xs font-bold shadow-md shadow-blue-500/20 transition-all cursor-pointer"
             >
-              <span>Save & Connect</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              <span>Save & Connect Custom Node</span>
+              <ArrowRight className="w-4 h-4" />
             </button>
           </div>
         </motion.div>
