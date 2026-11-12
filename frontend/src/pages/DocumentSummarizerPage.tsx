@@ -61,11 +61,16 @@ export const DocumentSummarizerPage: React.FC = () => {
     isInsufficient?: boolean;
   } | null>(null);
 
+  const [errorState, setErrorState] = useState<{ message: string; isOffline?: boolean } | null>(null);
   const [copied, setCopied] = useState(false);
 
   // Run summarization
   const handleGenerateSummary = async () => {
-    if (!inputText.trim() || inputText.trim().length < 4) return;
+    if (!inputText.trim() || inputText.trim().length < 8 || inputText.trim().split(/\s+/).filter(Boolean).length < 2) {
+      setErrorState({ message: "Please provide valid clinical documentation (at least 2 medical words or 8 characters) to synthesize a summary." });
+      return;
+    }
+    setErrorState(null);
     setIsProcessing(true);
     try {
       const res = await clinixApi.summarizeDocument(
@@ -76,6 +81,24 @@ export const DocumentSummarizerPage: React.FC = () => {
         selectedModel
       );
 
+      if (res.isInsufficient || res.status === 'insufficient_input') {
+        setSummaryData({
+          summaryId: res.summaryId || 'SUM-INSUFFICIENT',
+          summary: res.summary || 'Input text did not contain recognizable clinical findings, vitals, or symptoms.',
+          keyFindings: res.keyFindings?.length ? res.keyFindings : ['No verifiable medical findings detected in input document.'],
+          actionItems: res.actionItems?.length ? res.actionItems : ['Provide consultation notes, SOAP documentation, or upload a readable scan.'],
+          sections: res.sections || { STATUS: 'INSUFFICIENT_CLINICAL_DATA' },
+          citations: [],
+          flowsheet: [],
+          groundingScore: 0,
+          latencyMs: res.latencyMs || 0,
+          modelVersion: res.modelVersion || selectedModel,
+          patientReport: undefined,
+          isInsufficient: true,
+        });
+        return;
+      }
+
       // If patient mode or report available, resolve plain language AVS
       let patientRep: PatientReport | undefined = res.patientReport;
       if (!patientRep && !res.isInsufficient) {
@@ -85,7 +108,7 @@ export const DocumentSummarizerPage: React.FC = () => {
             patientRep = pRes;
           }
         } catch (pErr) {
-          console.warn('Patient report simplification fallback:', pErr);
+          console.warn('Patient report simplification notice:', pErr);
         }
       }
 
@@ -103,8 +126,15 @@ export const DocumentSummarizerPage: React.FC = () => {
         patientReport: patientRep,
         isInsufficient: Boolean(res.isInsufficient || patientRep?.is_insufficient),
       });
-    } catch (err) {
-      console.error('Summarization failed:', err);
+    } catch (err: any) {
+      const msg = err?.message || 'Failed to synthesize clinical document.';
+      const isOffline = msg.toLowerCase().includes('offline') || msg.toLowerCase().includes('failed to fetch') || msg.toLowerCase().includes('networkerror');
+      setErrorState({
+        message: isOffline 
+          ? 'Clinical Inference Gateway is offline or unreachable. Please check your backend connection in the header.'
+          : msg,
+        isOffline,
+      });
     } finally {
       setIsProcessing(false);
     }
@@ -336,6 +366,21 @@ export const DocumentSummarizerPage: React.FC = () => {
 
             {/* Content Area */}
             <div className="flex-1 overflow-y-auto pr-1">
+              {/* Dynamic Error State Alert Banner */}
+              {errorState && (
+                <div className="p-4 mb-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800 flex items-start gap-3 text-xs shadow-xs">
+                  <AlertTriangle className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-bold text-rose-900 dark:text-rose-200">
+                      {errorState.isOffline ? 'Inference Service Unreachable' : 'Summarization Alert'}
+                    </h4>
+                    <p className="text-rose-800 dark:text-rose-300 mt-0.5 leading-relaxed">
+                      {errorState.message}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {!summaryData && !isProcessing && (
                 <div className="h-full flex flex-col items-center justify-center text-center p-8 text-slate-400">
                   <div className="w-16 h-16 rounded-3xl bg-blue-50 dark:bg-blue-950/30 flex items-center justify-center text-blue-500 mb-4 border border-blue-200 dark:border-blue-900">

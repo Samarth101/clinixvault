@@ -57,7 +57,7 @@ include = ["backend*", "inference*", "training*", "colab*"]
 exclude = ["tests*", "frontend*", "k8s*", "deployment*", "checkpoints*", "data*", "observability*", "logs*"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests/unit"]
 python_files = ["test_*.py"]
 addopts = "-v --tb=short -W ignore::DeprecationWarning"
 

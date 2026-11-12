@@ -138,9 +138,9 @@ export const HeaderBar: React.FC<HeaderBarProps> = React.memo(({
 
   return (
     <>
-    <header className="w-full glass-card px-2.5 sm:px-4 py-2 mb-3 shrink-0 flex items-center justify-between gap-2 border border-white/90 dark:border-slate-800 shadow-diffuse z-40 backdrop-blur-3xl bg-white/85 dark:bg-slate-900/85 transition-all duration-200 min-w-0">
+    <header className="w-full glass-card px-2.5 sm:px-4 py-2 mb-3 shrink-0 flex items-center justify-between gap-2 border border-white/90 dark:border-slate-800 shadow-diffuse z-40 backdrop-blur-3xl bg-white/85 dark:bg-slate-900/85 transition-all duration-200 min-w-0 overflow-x-clip">
       {/* Brand & Clinician Session */}
-      <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0 shrink-0">
+      <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0 shrink-1">
         <div 
           onClick={onNavigateLanding}
           className="flex items-center gap-2 cursor-pointer group shrink-0"
@@ -158,8 +158,8 @@ export const HeaderBar: React.FC<HeaderBarProps> = React.memo(({
                 {currentUser.firmware}
               </span>
             </div>
-            <p className="hidden 2xl:block text-[11px] text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap">
-              Zero-Egress Air-Gapped Appliance • {currentUser.location}
+            <p className="hidden 2xl:block text-[11px] text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap truncate max-w-[200px]">
+              Zero-Egress Air-Gapped • {currentUser.location}
             </p>
           </div>
         </div>
@@ -176,7 +176,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = React.memo(({
             <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-clinical-blue text-white flex items-center justify-center font-bold text-[11px] sm:text-xs shadow-xs shrink-0">
               {currentUser.avatarInitials || 'MD'}
             </div>
-            <div className="hidden sm:block min-w-0 max-w-[85px] md:max-w-[110px] lg:max-w-[140px] xl:max-w-[170px] truncate">
+            <div className="hidden sm:block min-w-0 max-w-[85px] md:max-w-[110px] lg:max-w-[130px] xl:max-w-[160px] truncate">
               <div className="flex items-center gap-1 min-w-0">
                 <span className="text-xs font-bold text-slate-900 dark:text-white truncate">{currentUser.name}</span>
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
@@ -296,7 +296,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = React.memo(({
       </div>
 
       {/* Edge Metrics, Utility Controls & Air-Gap Telemetry */}
-      <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 flex-nowrap justify-end">
+      <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 flex-nowrap justify-end min-w-0">
         {/* Zero-Egress Offline Cache Sync Pill */}
         {cacheTelemetry.pendingCount > 0 && (
           <motion.button
@@ -312,13 +312,13 @@ export const HeaderBar: React.FC<HeaderBarProps> = React.memo(({
           </motion.button>
         )}
 
-        {/* Dynamic Dual-Node Failover Status Pill */}
-        {/* Acceptance criteria: amber = Colab GPU, emerald = Local Node, rose = Offline (reflects within 500ms) */}
+        {/* Dynamic Multi-Tier Failover Status Pill */}
+        {/* Priority order: Colab GPU (amber) -> Local Node (emerald) -> Render Cloud (sky) -> Offline (rose) */}
         <motion.button
           whileHover={{ scale: 1.03 }}
           whileTap={{ scale: 0.97 }}
           onClick={() => setIsBackendModalOpen(true)}
-          className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-xl border text-[11px] font-semibold shadow-xs transition-all cursor-pointer shrink-0 ${
+          className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-xl border text-[11px] font-semibold shadow-xs transition-all cursor-pointer shrink-0 z-10 ${
             isColabActive
               ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-200 border-amber-500/30'
               : isRenderActive
@@ -399,11 +399,11 @@ export const HeaderBar: React.FC<HeaderBarProps> = React.memo(({
           whileHover={{ scale: 1.03 }}
           whileTap={{ scale: 0.97 }}
           onClick={onOpenModelManager}
-          className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-xl bg-indigo-50/90 dark:bg-indigo-950/60 hover:bg-indigo-100/90 dark:hover:bg-indigo-900/60 border border-indigo-200/80 dark:border-indigo-800 text-indigo-900 dark:text-indigo-200 text-xs font-semibold shadow-xs transition-all cursor-pointer shrink-0"
+          className="hidden sm:flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-xl bg-indigo-50/90 dark:bg-indigo-950/60 hover:bg-indigo-100/90 dark:hover:bg-indigo-900/60 border border-indigo-200/80 dark:border-indigo-800 text-indigo-900 dark:text-indigo-200 text-xs font-semibold shadow-xs transition-all cursor-pointer shrink-0"
           title="Click to Open Model Manager & Unified Memory Dashboard"
         >
           <Cpu className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
-          <span className="hidden 2xl:inline font-extrabold text-[11px] max-w-[120px] truncate">{hardware?.gpu_name || hardware?.chip || 'Compute'}</span>
+          <span className="hidden 2xl:inline font-extrabold text-[11px] max-w-[100px] truncate">{hardware?.gpu_name || hardware?.chip || 'Compute'}</span>
           <span className="text-[10px] font-mono text-indigo-700 dark:text-indigo-300 bg-white/90 dark:bg-slate-900 px-1 py-0.5 rounded border border-indigo-200 dark:border-indigo-800 font-bold whitespace-nowrap">
             {hardware ? `${hardware.total_memory_gb}GB` : 'Ready'}
           </span>
@@ -452,8 +452,8 @@ export const HeaderBar: React.FC<HeaderBarProps> = React.memo(({
           </button>
         )}
 
-        {/* Isolated System Clock (IST) */}
-        <div className="hidden xl:block shrink-0">
+        {/* Isolated System Clock (IST) - Displayed on wide desktop viewports */}
+        <div className="hidden 2xl:block shrink-0">
           <HeaderClock />
         </div>
       </div>

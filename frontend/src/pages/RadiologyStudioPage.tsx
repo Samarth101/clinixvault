@@ -973,14 +973,15 @@ export const RadiologyStudioPage: React.FC<RadiologyStudioPageProps> = ({ onOpen
       setReportKey((k) => k + 1);
 
       // 1. Upload to backend storage and register Patient/Encounter in DB
-      const patientId = `patient-${Date.now().toString().slice(-4)}`;
+      const targetPid = activePatientId || `patient-${Date.now().toString().slice(-4)}`;
       let uploadedCase = null;
       try {
         uploadedCase = await clinixApi.uploadRadiologyStudy(
           file,
-          `Patient ${patientId}`,
+          activePatientId ? `Patient #${activePatientId}` : `Patient ${targetPid}`,
           "Stat diagnostic interpretation requested for uploaded chest radiograph.",
-          "Frontal"
+          "Frontal",
+          activePatientId || undefined
         );
       } catch (uploadErr) {
         console.warn("Backend upload endpoint notice:", uploadErr);
@@ -1457,49 +1458,75 @@ export const RadiologyStudioPage: React.FC<RadiologyStudioPageProps> = ({ onOpen
         </div>
 
         {/* Study Pills Carousel */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden scroll-smooth">
+        <div className="flex items-center gap-2 overflow-x-auto py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden scroll-smooth">
           {casesList.length === 0 ? (
             <div className="py-2 px-3 text-xs text-slate-400 font-mono italic">
-              No clinical radiograph studies loaded. Click 'Upload Patient Radiograph' above to import and interpret a study.
+              {activePatientId 
+                ? `No radiograph studies on record for Patient #${activePatientId}. Click 'Upload Patient Radiograph' above to import a study.`
+                : "No clinical radiograph studies loaded. Click 'Upload Patient Radiograph' above to import and interpret a study."}
             </div>
           ) : (
-            casesList.slice(0, 15).map((c) => {
-              const isSelected = selectedCase.id === c.id;
-              return (
-                <div key={c.id} className="relative group shrink-0 flex items-center">
-                  <motion.button
-                    onClick={() => {
-                      setSelectedCase(c);
-                      setActiveProjectionIdx(0);
-                      setIsGenerating(false);
-                      try {
-                        localStorage.setItem(storageKey, JSON.stringify(c));
-                      } catch {}
-                    }}
-                    whileHover={{ y: -1 }}
-                    whileTap={{ scale: 0.98 }}
-                    className={`px-3 py-1.5 pr-6 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer border flex items-center gap-1.5 ${
-                      isSelected
-                        ? 'bg-slate-900 dark:bg-clinical-blue text-white border-transparent shadow-md'
-                        : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 border-slate-200 dark:border-slate-700'
-                    }`}
-                  >
-                    <span>{c.id}</span>
-                  </motion.button>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleClearCase(c.id);
-                    }}
-                    title="Dismiss Study Tab"
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-rose-500 p-0.5 rounded cursor-pointer transition-colors"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              );
-            })
+            <>
+              {casesList.slice(0, 15).map((c) => {
+                const isSelected = selectedCase.id === c.id;
+                // Render concise human-readable study identifier
+                const displayId = c.id.startsWith('UPLOAD-')
+                  ? c.id.replace('UPLOAD-', '')
+                  : c.id;
+
+                return (
+                  <div key={c.id} className="relative group shrink-0 flex items-center">
+                    <motion.button
+                      onClick={() => {
+                        setSelectedCase(c);
+                        setActiveProjectionIdx(0);
+                        setIsGenerating(false);
+                        try {
+                          localStorage.setItem(storageKey, JSON.stringify(c));
+                        } catch {}
+                      }}
+                      whileHover={{ y: -1 }}
+                      whileTap={{ scale: 0.98 }}
+                      className={`px-3 py-1.5 pr-7 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer border flex items-center gap-1.5 ${
+                        isSelected
+                          ? 'bg-slate-900 dark:bg-clinical-blue text-white border-transparent shadow-md'
+                          : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 border-slate-200 dark:border-slate-700'
+                      }`}
+                      title={`Study ID: ${c.id}\nPatient: ${c.patient}\nClick to view and generate report`}
+                    >
+                      <span className="font-mono">{displayId}</span>
+                    </motion.button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleClearCase(c.id);
+                      }}
+                      title="Dismiss Study Tab"
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-rose-500 p-0.5 rounded cursor-pointer transition-colors"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                );
+              })}
+              {casesList.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCasesList([]);
+                    setSelectedCase(EMPTY_CASE);
+                    try {
+                      localStorage.removeItem(storageKey);
+                    } catch {}
+                  }}
+                  className="px-2 py-1 text-[10px] font-semibold text-slate-400 hover:text-rose-600 transition-colors whitespace-nowrap cursor-pointer shrink-0"
+                  title="Clear all open study tabs"
+                >
+                  Clear All
+                </button>
+              )}
+            </>
           )}
         </div>
       </motion.div>
@@ -2357,7 +2384,18 @@ export const RadiologyStudioPage: React.FC<RadiologyStudioPageProps> = ({ onOpen
             </div>
 
             <div className="space-y-2">
-              {currentPathologies.map((path) => {
+              {inferenceError || (!selectedCase.reportId && (!selectedCase.findings || selectedCase.findings.includes("Diagnostic findings available"))) ? (
+                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 text-center text-xs text-slate-500">
+                  <Activity className="w-5 h-5 mx-auto text-slate-400 mb-1.5" />
+                  <p className="font-semibold text-slate-700 dark:text-slate-300">Awaiting AI Multi-Label Classification</p>
+                  <p className="text-[11px] text-slate-400 mt-1 max-w-xs mx-auto">
+                    {inferenceError 
+                      ? 'Inference was interrupted or timed out. Click "Retry Analysis" to re-run the classification engine.' 
+                      : 'Click "Generate Report" to run computer vision analysis and compute calibrated pathology probabilities.'}
+                  </p>
+                </div>
+              ) : (
+                currentPathologies.map((path) => {
                 const isPos = path.status === 'positive';
                 const pct = (path.score * 100).toFixed(1);
                 const isHighConf = path.score >= 0.70;
@@ -2429,7 +2467,7 @@ export const RadiologyStudioPage: React.FC<RadiologyStudioPageProps> = ({ onOpen
                     </div>
                   </div>
                 );
-              })}
+              }))}
             </div>
           </div>
 
@@ -2800,25 +2838,27 @@ export const RadiologyStudioPage: React.FC<RadiologyStudioPageProps> = ({ onOpen
                 </div>
               ) : effectiveReportTab === 'clinician' ? (
                 <div className="space-y-3.5 text-xs">
-                  {/* Agentic Critic Audit Pill */}
-                  <div className="p-3 bg-gradient-to-r from-emerald-50/90 via-teal-50/80 to-blue-50/90 border border-emerald-200/90 rounded-2xl flex flex-wrap items-center justify-between gap-2 shadow-xs">
-                    <div className="flex items-center gap-2">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-600 text-white font-bold text-[11px] shadow-xs">
-                        <ShieldCheck className="w-3.5 h-3.5" />
-                        Critic Verified
-                      </span>
-                      <span className="text-[11px] font-semibold text-slate-700">
-                        {(!selectedCase.critic_audit?.unsupported_assertions || selectedCase.critic_audit.unsupported_assertions.length === 0)
-                          ? '0 Hallucinations'
-                          : `${selectedCase.critic_audit.unsupported_assertions.length} Hallucinations Pruned`} • NegEx Validated
-                      </span>
+                  {/* Agentic Critic Audit Pill - Only show when report is successfully generated and verified */}
+                  {!inferenceError && (selectedCase.critic_audit || selectedCase.reportId) && (
+                    <div className="p-3 bg-gradient-to-r from-emerald-50/90 via-teal-50/80 to-blue-50/90 border border-emerald-200/90 rounded-2xl flex flex-wrap items-center justify-between gap-2 shadow-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-600 text-white font-bold text-[11px] shadow-xs">
+                          <ShieldCheck className="w-3.5 h-3.5" />
+                          Critic Verified
+                        </span>
+                        <span className="text-[11px] font-semibold text-slate-700">
+                          {(!selectedCase.critic_audit?.unsupported_assertions || selectedCase.critic_audit.unsupported_assertions.length === 0)
+                            ? '0 Hallucinations'
+                            : `${selectedCase.critic_audit.unsupported_assertions.length} Hallucinations Pruned`} • NegEx Validated
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-[10px] font-black bg-white/90 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-md">
+                          {Math.round(((selectedCase.critic_audit?.consistency_score ?? 1.0) * 100))}% Consistency
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-[10px] font-black bg-white/90 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-md">
-                        {Math.round(((selectedCase.critic_audit?.consistency_score ?? 1.0) * 100))}% Consistency
-                      </span>
-                    </div>
-                  </div>
+                  )}
 
                   {/* Diagnostic Failure / System Alert */}
                   {inferenceError && (

@@ -38,7 +38,7 @@ jobs:
 
       - name: Run Pytest Unit & Integration Tests
         run: |
-          python3 -m pytest tests/unit -v --durations=10
+          python -m pytest tests/unit -v
 
   build-frontend:
     name: Frontend TypeScript & Vite Production Build
