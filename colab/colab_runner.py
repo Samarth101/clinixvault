@@ -432,7 +432,9 @@ def start_colab_observability_bridge(watchdog: ColabGPUWatchdog):
     if os.path.exists(alloy_bin) and config_path.exists():
         tmp_storage = Path("/tmp/clinixvault_alloy_colab")
         tmp_storage.mkdir(parents=True, exist_ok=True)
+        alloy_log = Path("/tmp/clinixvault_alloy.log")
         try:
+            alf = open(alloy_log, "a")
             subprocess.Popen(
                 [
                     alloy_bin,
@@ -442,12 +444,57 @@ def start_colab_observability_bridge(watchdog: ColabGPUWatchdog):
                     str(config_path),
                 ],
                 env=os.environ,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+                stdout=alf,
+                stderr=alf,
             )
             print(f"{GREEN}{BOLD}[{now_ist_str()}] 📈 [GRAFANA CLOUD] Alloy agent actively scraping :8000/metrics and remote-writing to Prometheus!{RESET}")
+            print(f"{CYAN}   (Alloy background telemetry log streaming to {alloy_log}){RESET}")
         except Exception as e:
             print(f"{YELLOW}[{now_ist_str()}] ⚠️ Alloy daemon launch warning: {e}{RESET}")
+
+
+def configure_colab_storage():
+    """
+    Zero-headache sovereign storage for Colab:
+    Automatically binds SQLite database and in-memory knowledge graph if local
+    PostgreSQL/Neo4j daemons are not running, eliminating all connection timeouts
+    and manual database setup headaches.
+    """
+    import socket
+
+    # 1. Probe PostgreSQL on port 5432
+    pg_active = False
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(0.08)
+            pg_active = (s.connect_ex(("127.0.0.1", 5432)) == 0)
+    except Exception:
+        pg_active = False
+
+    if not pg_active:
+        db_dir = PROJECT_ROOT / "backend" / "database"
+        db_dir.mkdir(parents=True, exist_ok=True)
+        sqlite_path = db_dir / "clinixvault_edge.db"
+        os.environ["DATABASE_URL"] = f"sqlite:///{sqlite_path}"
+        print(f"{GREEN}[{now_ist_str()}] 📁 [STORAGE] Sovereign Edge SQLite active ({sqlite_path.name}). Zero setup required.{RESET}")
+    else:
+        print(f"{GREEN}[{now_ist_str()}] 🐘 [STORAGE] Local PostgreSQL detected on port 5432.{RESET}")
+
+    # 2. Probe Neo4j on port 7687
+    neo4j_active = False
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(0.08)
+            neo4j_active = (s.connect_ex(("127.0.0.1", 7687)) == 0)
+    except Exception:
+        neo4j_active = False
+
+    if not neo4j_active:
+        os.environ["NEO4J_DISABLED"] = "true"
+        os.environ["NEO4J_ENABLED"] = "false"
+        print(f"{GREEN}[{now_ist_str()}] 🕸️ [GRAPH STORE] In-Memory Clinical Knowledge Graph active. Zero setup required.{RESET}")
+    else:
+        print(f"{GREEN}[{now_ist_str()}] 🕸️ [GRAPH STORE] Local Neo4j detected on bolt://127.0.0.1:7687.{RESET}")
 
 
 # ============================================================================
@@ -505,6 +552,9 @@ def main():
         hf_token=args.hf_token,
         org=args.hf_org,
     )
+
+    # Zero-headache storage autoconfig (SQLite + In-Memory Graph)
+    configure_colab_storage()
 
     # Connect Observability
     start_colab_observability_bridge(watchdog)

@@ -353,7 +353,8 @@ async def scribe_websocket_stream(websocket: WebSocket):
                 smoothed_rms_db = round(alpha * raw_db + (1.0 - alpha) * smoothed_rms_db, 1)
                 rms_db = max(28.0, min(94.0, smoothed_rms_db))
 
-                if rms_db >= 44.0:
+                # High-sensitivity clinical VAD: captures soft, conversational, and distant speech (34.0 dB)
+                if rms_db >= 34.0:
                     is_speaking = True
                     consecutive_silence_chunks = 0
                 else:
@@ -363,11 +364,11 @@ async def scribe_websocket_stream(websocket: WebSocket):
                 chunk_transcript = ""
 
                 # Transcribe cohesive speech when:
-                # 1. Voice activity occurred and paused (silence for >= 5 chunks ~ 640ms, with at least 0.75s / 24,000 bytes of speech audio)
-                # 2. Or continuous speech buffer reached ~5.0 seconds (160,000 bytes) WHILE is_speaking is True
+                # 1. Voice activity occurred and paused (silence for >= 3 chunks ~ 384ms, with at least 0.5s / 16,000 bytes)
+                # 2. Or continuous speech buffer reached >= 3.0 seconds (96,000 bytes)
                 should_transcribe = is_speaking and (
-                    (consecutive_silence_chunks >= 5 and len(audio_buffer) >= 24000)
-                    or (len(audio_buffer) >= 160000)
+                    (consecutive_silence_chunks >= 3 and len(audio_buffer) >= 16000)
+                    or (len(audio_buffer) >= 96000)
                 )
 
                 if should_transcribe:
@@ -402,6 +403,7 @@ async def scribe_websocket_stream(websocket: WebSocket):
                             # Automatically classify speaker from clinical semantics and context
                             current_speaker = auto_classify_speaker(chunk_transcript, transcript_accumulator)
                             active_speaker = current_speaker
+                            logger.info(f"🎙️ [SCRIBE TRANSCRIBED] ({current_speaker}): {chunk_transcript}")
 
                             # Avoid appending immediate duplicate of the last turn
                             if not transcript_accumulator or transcript_accumulator[-1]["text"].strip().lower() != chunk_transcript.lower():
@@ -413,8 +415,8 @@ async def scribe_websocket_stream(websocket: WebSocket):
                                     transcript_accumulator = recluster_conversation_turns(transcript_accumulator)
                     except Exception as err:
                         logger.debug(f"Live chunk transcription note: {err}")
-                elif not is_speaking and len(audio_buffer) > 8192:
-                    # Retain a short pre-roll acoustic window (256ms) so speech onset is never clipped
+                elif not is_speaking and consecutive_silence_chunks > 10 and len(audio_buffer) > 8192:
+                    # Retain a short pre-roll acoustic window (256ms) after prolonged room silence
                     audio_buffer = bytearray(audio_buffer[-8192:])
 
                 now_ts = time.time()

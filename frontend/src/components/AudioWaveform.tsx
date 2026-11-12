@@ -254,10 +254,8 @@ export const AudioWaveform: React.FC<AudioWaveformProps> = ({
           try {
             if (typeof event.data === 'string') {
               const data = JSON.parse(event.data);
-              // Only insert turns produced by backend transcription models to avoid duplicating turns already dispatched by Web Speech API
-              if (data.type === 'audio_frame_ack' && data.turn) {
-                onNewTurn?.(data.turn);
-              } else if (data.type === 'transcription_turn' && data.turn) {
+              // Handle turns emitted by backend transcription models or dialogue turns
+              if ((data.type === 'audio_frame_ack' || data.type === 'transcription_turn' || data.type === 'turn_ack') && data.turn) {
                 onNewTurn?.(data.turn);
               }
             }
@@ -303,10 +301,6 @@ export const AudioWaveform: React.FC<AudioWaveformProps> = ({
           recognition.interimResults = false;
           recognition.lang = 'en-US';
           recognition.onresult = (e: any) => {
-            // When backend Faster-Whisper WebSocket is active, Faster-Whisper is the authoritative sovereign ASR
-            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-              return;
-            }
             for (let i = e.resultIndex; i < e.results.length; ++i) {
               if (e.results[i].isFinal) {
                 const transcriptText = e.results[i][0].transcript.trim();
@@ -314,6 +308,18 @@ export const AudioWaveform: React.FC<AudioWaveformProps> = ({
                   const nowOffset = Math.max(0, Date.now() - startTimeRef.current);
                   const autoSpeaker = autoClassifySpeech(transcriptText, activeSpeakerRef.current === 'Doctor' ? 'Doctor' : 'Patient');
                   activeSpeakerRef.current = autoSpeaker;
+
+                  // If backend WebSocket is active, synchronize the dialogue utterance with the server
+                  if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                    try {
+                      wsRef.current.send(JSON.stringify({
+                        type: 'dialogue_turn',
+                        text: transcriptText,
+                        speaker: autoSpeaker,
+                      }));
+                    } catch {}
+                  }
+
                   const turn: SpeakerTurn = {
                     id: `turn-live-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
                     speaker: autoSpeaker,
