@@ -66,7 +66,7 @@ export const App: React.FC = () => {
     const handleFailoverNotice = (e: any) => {
       const { to, reason } = e.detail || {};
       if (to === 'local') {
-        setExportNotice(`⚡ Dual-Node Failover: Active inference switched to Local Edge (${reason})`);
+        setExportNotice(`⚡ Multi-Tier Failover: Active inference switched to Local Edge (${reason})`);
       } else if (to === 'colab') {
         setExportNotice('⚡ Failback: Active inference reconnected to Colab GPU Node');
       }

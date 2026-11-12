@@ -162,6 +162,7 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onNavigate }) => {
       if (created) {
         if (typeof window !== 'undefined' && created.id) {
           localStorage.setItem('clinixvault_active_patient_id', created.id);
+          window.dispatchEvent(new CustomEvent('clinixvault:patient_changed', { detail: { patientId: created.id } }));
         }
         // Instant optimistic display (<16ms)
         setPatients((prev) => [created, ...prev.filter((p) => p.id !== created.id)]);
@@ -474,6 +475,7 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onNavigate }) => {
                       onClick={() => {
                         if (typeof window !== 'undefined') {
                           localStorage.setItem('clinixvault_active_patient_id', patient.id);
+                          window.dispatchEvent(new CustomEvent('clinixvault:patient_changed', { detail: { patientId: patient.id } }));
                         }
                         onNavigate('overview');
                       }}
@@ -487,6 +489,7 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onNavigate }) => {
                       onClick={() => {
                         if (typeof window !== 'undefined') {
                           localStorage.setItem('clinixvault_active_patient_id', patient.id);
+                          window.dispatchEvent(new CustomEvent('clinixvault:patient_changed', { detail: { patientId: patient.id } }));
                         }
                         onNavigate('radiology');
                       }}

@@ -96,7 +96,15 @@ const derivePathologies = (
   findings: string,
   impression: string
 ): { name: string; score: number; status: 'positive' | 'negative' }[] => {
-  const text = ((findings || '') + ' ' + (impression || '')).toLowerCase();
+  const fTrim = (findings || '').trim();
+  const iTrim = (impression || '').trim();
+  if (!fTrim && !iTrim) {
+    return [];
+  }
+  if (fTrim.includes("Diagnostic findings available") || iTrim.includes("Awaiting AI interpretation")) {
+    return [];
+  }
+  const text = (fTrim + ' ' + iTrim).toLowerCase();
 
   // String hash for deterministic, natural score calibration across studies
   let hash = 0;
@@ -528,8 +536,24 @@ const renderScoordOverlay = (box: ScoordBox, score?: number, isPinned?: boolean)
 };
 
 export const RadiologyStudioPage: React.FC<RadiologyStudioPageProps> = ({ onOpenModelManager: _onOpenModelManager, onNavigate, patientId }) => {
-  const activePatientId = patientId || (typeof window !== 'undefined' ? localStorage.getItem('clinixvault_active_patient_id') : null);
+  const [activePatientId, setActivePatientId] = useState<string | null>(() => {
+    return patientId || (typeof window !== 'undefined' ? localStorage.getItem('clinixvault_active_patient_id') : null);
+  });
   const storageKey = activePatientId ? `clinixvault_last_radiology_study_${activePatientId}` : 'clinixvault_last_radiology_study';
+
+  useEffect(() => {
+    const syncPatient = () => {
+      const pid = patientId || (typeof window !== 'undefined' ? localStorage.getItem('clinixvault_active_patient_id') : null);
+      setActivePatientId(pid);
+    };
+    syncPatient();
+    window.addEventListener('storage', syncPatient);
+    window.addEventListener('clinixvault:patient_changed', syncPatient);
+    return () => {
+      window.removeEventListener('storage', syncPatient);
+      window.removeEventListener('clinixvault:patient_changed', syncPatient);
+    };
+  }, [patientId]);
 
   const [selectedCase, setSelectedCase] = useState<RadiologyCase>(() => {
     try {
@@ -819,7 +843,7 @@ export const RadiologyStudioPage: React.FC<RadiologyStudioPageProps> = ({ onOpen
 
           const pathologies = (c.pathologies && c.pathologies.length > 0)
             ? c.pathologies
-            : derivePathologies(c.findings || '', c.impression || '');
+            : (c.findings && !c.findings.includes("Diagnostic findings available") ? derivePathologies(c.findings, c.impression || '') : []);
 
           return {
             id: studyId,
@@ -842,25 +866,26 @@ export const RadiologyStudioPage: React.FC<RadiologyStudioPageProps> = ({ onOpen
         setCasesList((prev) => {
           if (activePatientId) {
             // Strictly retain authentic cases belonging to active patient
-            const userUploads = prev.filter(c => (c.id.startsWith('UPLOAD-') || c.id.startsWith('patient-')) && c.patient.includes(activePatientId));
+            const userUploads = prev.filter(c => (c.id.startsWith('UPLOAD-') || c.id.startsWith('patient-')) && (c.patient.includes(activePatientId) || c.id.includes(activePatientId)));
             const uploadIds = new Set(userUploads.map(c => c.id));
-            const patientCases = mappedCases.filter(c => !uploadIds.has(c.id));
+            const patientCases = mappedCases.filter(c => (c.patient?.includes(activePatientId) || c.id.includes(activePatientId)) && !uploadIds.has(c.id));
             return [...userUploads, ...patientCases];
           }
-          const userUploads = prev.filter(c => c.id.startsWith('UPLOAD-') || c.id.startsWith('patient-') || (c.customImageUrl && (c.customImageUrl.startsWith('data:') || c.customImageUrl.startsWith('blob:'))));
-          const uploadIds = new Set(userUploads.map(c => c.id));
-          const genuineUploads = mappedCases.filter(c => !uploadIds.has(c.id));
-          return [...userUploads, ...genuineUploads];
+          if (query) {
+            return mappedCases;
+          }
+          return [];
         });
 
         setSelectedCase((prev) => {
           if (prev && prev.id && prev.id !== 'EMPTY') {
-            if (!activePatientId || prev.id.includes(activePatientId) || (prev.patient && prev.patient.includes(activePatientId))) {
+            if (activePatientId && (prev.id.includes(activePatientId) || (prev.patient && prev.patient.includes(activePatientId)))) {
               return prev;
             }
           }
           if (activePatientId) {
-            return mappedCases.length > 0 ? mappedCases[0] : EMPTY_CASE;
+            const match = mappedCases.find(c => c.patient?.includes(activePatientId) || c.id.includes(activePatientId));
+            return match || EMPTY_CASE;
           }
           return EMPTY_CASE;
         });
@@ -890,7 +915,7 @@ export const RadiologyStudioPage: React.FC<RadiologyStudioPageProps> = ({ onOpen
 
     // Load authentic clinical cases
     loadDynamicCases();
-  }, []);
+  }, [activePatientId]);
 
   // Restore saved in-flight radiology draft from IndexedDB cache
   useEffect(() => {
@@ -1001,7 +1026,7 @@ export const RadiologyStudioPage: React.FC<RadiologyStudioPageProps> = ({ onOpen
           indication: "Stat diagnostic interpretation requested for uploaded study.",
           customImageUrl: dataUrl,
           isDicomFile: file.name.toLowerCase().endsWith('.dcm'),
-          pathologies: derivePathologies("", ""),
+          pathologies: [],
           findings: "Generating authentic clinical report via ClinixVault Two-Stage Hierarchical VLM...",
           impression: "Formulating verified impression...",
           windowPreset: "Lung Window",
@@ -1467,12 +1492,15 @@ export const RadiologyStudioPage: React.FC<RadiologyStudioPageProps> = ({ onOpen
             </div>
           ) : (
             <>
-              {casesList.slice(0, 15).map((c) => {
+              {casesList.slice(0, 15).map((c, idx) => {
                 const isSelected = selectedCase.id === c.id;
                 // Render concise human-readable study identifier
                 const displayId = c.id.startsWith('UPLOAD-')
                   ? c.id.replace('UPLOAD-', '')
                   : c.id;
+                const shortTag = displayId.length > 10 ? displayId.slice(-6) : displayId;
+                const viewName = c.view ? c.view.split(' ')[0] : 'PA';
+                const tabLabel = `Study #${idx + 1} • ${viewName} (${shortTag})`;
 
                 return (
                   <div key={c.id} className="relative group shrink-0 flex items-center">
@@ -1494,7 +1522,7 @@ export const RadiologyStudioPage: React.FC<RadiologyStudioPageProps> = ({ onOpen
                       }`}
                       title={`Study ID: ${c.id}\nPatient: ${c.patient}\nClick to view and generate report`}
                     >
-                      <span className="font-mono">{displayId}</span>
+                      <span className="font-mono">{tabLabel}</span>
                     </motion.button>
                     <button
                       type="button"
@@ -2384,7 +2412,7 @@ export const RadiologyStudioPage: React.FC<RadiologyStudioPageProps> = ({ onOpen
             </div>
 
             <div className="space-y-2">
-              {inferenceError || (!selectedCase.reportId && (!selectedCase.findings || selectedCase.findings.includes("Diagnostic findings available"))) ? (
+              {inferenceError || !selectedCase.id || currentPathologies.length === 0 || (!selectedCase.reportId && (!selectedCase.findings || selectedCase.findings.includes("Diagnostic findings available"))) ? (
                 <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 text-center text-xs text-slate-500">
                   <Activity className="w-5 h-5 mx-auto text-slate-400 mb-1.5" />
                   <p className="font-semibold text-slate-700 dark:text-slate-300">Awaiting AI Multi-Label Classification</p>
@@ -2839,7 +2867,7 @@ export const RadiologyStudioPage: React.FC<RadiologyStudioPageProps> = ({ onOpen
               ) : effectiveReportTab === 'clinician' ? (
                 <div className="space-y-3.5 text-xs">
                   {/* Agentic Critic Audit Pill - Only show when report is successfully generated and verified */}
-                  {!inferenceError && (selectedCase.critic_audit || selectedCase.reportId) && (
+                  {!inferenceError && (selectedCase.critic_audit || selectedCase.reportId) && selectedCase.findings && !selectedCase.findings.includes("Diagnostic findings available") && (
                     <div className="p-3 bg-gradient-to-r from-emerald-50/90 via-teal-50/80 to-blue-50/90 border border-emerald-200/90 rounded-2xl flex flex-wrap items-center justify-between gap-2 shadow-xs">
                       <div className="flex items-center gap-2">
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-600 text-white font-bold text-[11px] shadow-xs">
