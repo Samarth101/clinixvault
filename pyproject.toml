@@ -8,7 +8,7 @@ version = "1.0.0"
 description = "Air-gapped edge AI clinical appliance for radiology report generation, ambient medical scribing, and record synthesis."
 readme = "README.md"
 requires-python = ">=3.10"
-license = {text = "Apache-2.0"}
+license = "Apache-2.0"
 authors = [
     {name = "ClinixVault Engineering Team", email = "engineering@clinixvault.internal"}
 ]
@@ -50,6 +50,11 @@ inference = [
     "pytesseract>=0.3.10",
     "outlines>=0.0.34"
 ]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["backend*", "inference*", "training*", "colab*"]
+exclude = ["tests*", "frontend*", "k8s*", "deployment*", "checkpoints*", "data*", "observability*", "logs*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
