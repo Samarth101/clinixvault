@@ -20,7 +20,7 @@ echo -e "${CYAN}================================================================
 echo -e "\n${GREEN}[1/2] Setting up PostgreSQL on Colab (port 5432)...${RESET}"
 if ! command -v psql &>/dev/null; then
     apt-get update -qq
-    apt-get install -y -qq postgresql postgresql-contrib
+    apt-get install -y -qq postgresql postgresql-contrib postgresql-16-pgvector 2>/dev/null || apt-get install -y -qq postgresql postgresql-contrib
 fi
 
 # Ensure service is running
