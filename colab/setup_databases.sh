@@ -28,8 +28,8 @@ service postgresql start || /etc/init.d/postgresql start
 
 # Configure user and database
 sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD 'postgres';" >/dev/null 2>&1 || true
-sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname = 'clinixvault'" | grep -q 1 || \
-    sudo -u postgres psql -c "CREATE DATABASE clinixvault;" >/dev/null 2>&1 || true
+sudo -u postgres createdb clinixvault 2>/dev/null || sudo -u postgres psql -c "CREATE DATABASE clinixvault;" >/dev/null 2>&1 || true
+sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE clinixvault TO postgres;" >/dev/null 2>&1 || true
 
 # Test connectivity
 if PGPASSWORD=postgres psql -U postgres -h 127.0.0.1 -d clinixvault -c "SELECT 1" >/dev/null 2>&1; then
@@ -57,9 +57,11 @@ if [ ! -d "$NEO4J_DIR" ]; then
     mv /content/neo4j-community-5.26.0 "$NEO4J_DIR"
     rm -f /tmp/neo4j.tar.gz
 
-    # Configure default password for ClinixVault
-    echo -e "   Configuring Neo4j initial credentials (neo4j / clinixvault2026)..."
+    # Configure default password for ClinixVault and permit flexible local auth
+    echo -e "   Configuring Neo4j initial credentials and listening endpoints..."
     "$NEO4J_DIR/bin/neo4j-admin" dbms set-initial-password clinixvault2026 || true
+    echo "server.default_listen_address=0.0.0.0" >> "$NEO4J_DIR/conf/neo4j.conf"
+    echo "dbms.security.auth_enabled=false" >> "$NEO4J_DIR/conf/neo4j.conf"
 fi
 
 # Start Neo4j daemon

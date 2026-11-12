@@ -119,6 +119,20 @@ prometheus.remote_write "grafanacloud" {
 local.file_match "clinixvault_logs" {
   path_targets = [
     {
+      __path__    = sys.env("CLINIXVAULT_LOG_DIR") + "/*.log",
+      job         = "clinixvault",
+      app         = "clinixvault-core",
+      environment = "production",
+      instance    = "clinixvault-node",
+    },
+    {
+      __path__    = "/content/clinixvault/logs/*.log",
+      job         = "clinixvault",
+      app         = "clinixvault-colab",
+      environment = "colab-production",
+      instance    = "clinixvault-colab-gpu",
+    },
+    {
       __path__    = "/Users/samarthbhandegaonkar/Desktop/clinixvault/logs/*.log",
       job         = "clinixvault",
       app         = "clinixvault-edge",
@@ -130,7 +144,7 @@ local.file_match "clinixvault_logs" {
       job         = "clinixvault",
       app         = "clinixvault-edge",
       environment = "edge-production",
-      instance    = "clinixvault-apple-silicon",
+      instance    = "clinixvault-linux",
     },
   ]
 }

@@ -453,48 +453,62 @@ def start_colab_observability_bridge(watchdog: ColabGPUWatchdog):
             print(f"{YELLOW}[{now_ist_str()}] ⚠️ Alloy daemon launch warning: {e}{RESET}")
 
 
-def configure_colab_storage():
+def configure_colab_storage(force_sqlite: bool = False):
     """
-    Zero-headache sovereign storage for Colab:
-    Automatically binds SQLite database and in-memory knowledge graph if local
-    PostgreSQL/Neo4j daemons are not running, eliminating all connection timeouts
-    and manual database setup headaches.
+    Automated sovereign enterprise storage for Colab:
+    1. Checks if PostgreSQL (5432) and Neo4j (7687) are already active.
+    2. If not active and not force_sqlite, automatically runs colab/setup_databases.sh
+       to install and start native PostgreSQL and Neo4j Community inside Colab.
+    3. Re-probes ports and connects to live PostgreSQL and Neo4j!
+    4. Falls back to durable SQLite / in-memory graph only if force_sqlite is requested.
     """
     import socket
 
-    # 1. Probe PostgreSQL on port 5432
-    pg_active = False
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.settimeout(0.08)
-            pg_active = (s.connect_ex(("127.0.0.1", 5432)) == 0)
-    except Exception:
-        pg_active = False
+    def check_port(port: int, host: str = "127.0.0.1") -> bool:
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(0.12)
+                return s.connect_ex((host, port)) == 0
+        except Exception:
+            return False
 
-    if not pg_active:
+    pg_active = check_port(5432)
+    neo4j_active = check_port(7687)
+
+    # Auto-provision PostgreSQL & Neo4j inside Colab if not active
+    is_colab_env = os.path.exists("/content") or "COLAB_GPU" in os.environ
+    if (not pg_active or not neo4j_active) and not force_sqlite and is_colab_env:
+        db_script = PROJECT_ROOT / "colab" / "setup_databases.sh"
+        if db_script.exists():
+            print(f"{CYAN}{BOLD}[{now_ist_str()}] 🐘🕸️ [AUTO-PROVISION] Installing & launching PostgreSQL + Neo4j inside Colab...{RESET}")
+            subprocess.run(["bash", str(db_script)], check=False)
+            time.sleep(1)
+            pg_active = check_port(5432)
+            neo4j_active = check_port(7687)
+
+    # Configure PostgreSQL
+    if pg_active and not force_sqlite:
+        os.environ["DATABASE_URL"] = "postgresql+psycopg2://postgres:postgres@localhost:5432/clinixvault"
+        print(f"{GREEN}{BOLD}[{now_ist_str()}] 🐘 [STORAGE] PostgreSQL active on 127.0.0.1:5432 (Database: clinixvault).{RESET}")
+    else:
         db_dir = PROJECT_ROOT / "backend" / "database"
         db_dir.mkdir(parents=True, exist_ok=True)
         sqlite_path = db_dir / "clinixvault_edge.db"
         os.environ["DATABASE_URL"] = f"sqlite:///{sqlite_path}"
-        print(f"{GREEN}[{now_ist_str()}] 📁 [STORAGE] Sovereign Edge SQLite active ({sqlite_path.name}). Zero setup required.{RESET}")
+        print(f"{YELLOW}[{now_ist_str()}] 📁 [STORAGE] Sovereign Edge SQLite active ({sqlite_path.name}).{RESET}")
+
+    # Configure Neo4j
+    if neo4j_active and not force_sqlite:
+        os.environ["NEO4J_URI"] = "bolt://localhost:7687"
+        os.environ["NEO4J_USER"] = "neo4j"
+        os.environ["NEO4J_PASSWORD"] = "clinixvault2026"
+        os.environ["NEO4J_DISABLED"] = "false"
+        os.environ["NEO4J_ENABLED"] = "true"
+        print(f"{GREEN}{BOLD}[{now_ist_str()}] 🕸️ [GRAPH STORE] Neo4j Community active on bolt://localhost:7687 (User: neo4j).{RESET}")
     else:
-        print(f"{GREEN}[{now_ist_str()}] 🐘 [STORAGE] Local PostgreSQL detected on port 5432.{RESET}")
-
-    # 2. Probe Neo4j on port 7687
-    neo4j_active = False
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.settimeout(0.08)
-            neo4j_active = (s.connect_ex(("127.0.0.1", 7687)) == 0)
-    except Exception:
-        neo4j_active = False
-
-    if not neo4j_active:
         os.environ["NEO4J_DISABLED"] = "true"
         os.environ["NEO4J_ENABLED"] = "false"
-        print(f"{GREEN}[{now_ist_str()}] 🕸️ [GRAPH STORE] In-Memory Clinical Knowledge Graph active. Zero setup required.{RESET}")
-    else:
-        print(f"{GREEN}[{now_ist_str()}] 🕸️ [GRAPH STORE] Local Neo4j detected on bolt://127.0.0.1:7687.{RESET}")
+        print(f"{YELLOW}[{now_ist_str()}] 🕸️ [GRAPH STORE] In-Memory Clinical Knowledge Graph active.{RESET}")
 
 
 # ============================================================================
@@ -508,7 +522,7 @@ def main():
     parser.add_argument("--hf-org", type=str, default="ClinixVault", help="Hugging Face Org / Username")
     parser.add_argument("--port", type=int, default=8000, help="Port to bind the API Gateway")
     parser.add_argument("--whisper-model", type=str, default="large-v3-turbo", help="Whisper ASR model size")
-    parser.add_argument("--setup-dbs", action="store_true", help="Automatically install and run PostgreSQL and Neo4j inside Colab")
+    parser.add_argument("--use-sqlite", action="store_true", help="Force lightweight SQLite storage instead of PostgreSQL/Neo4j")
     parser.add_argument("--sync-git", action="store_true", help="Sync latest code from Git and exit")
     parser.add_argument("--no-tunnel", action="store_true", help="Do not start Cloudflare tunnel")
 
@@ -517,12 +531,6 @@ def main():
     if args.sync_git:
         sync_codebase_from_git()
         return
-
-    if args.setup_dbs:
-        db_script = PROJECT_ROOT / "colab" / "setup_databases.sh"
-        if db_script.exists():
-            print(f"{CYAN}🔧 Running database provisioner (PostgreSQL + Neo4j)...{RESET}")
-            subprocess.run(["bash", str(db_script)], check=False)
 
     print(f"{BLUE}{BOLD}")
     print(r"""
@@ -553,8 +561,8 @@ def main():
         org=args.hf_org,
     )
 
-    # Zero-headache storage autoconfig (SQLite + In-Memory Graph)
-    configure_colab_storage()
+    # Enterprise database autoconfig (PostgreSQL + Neo4j)
+    configure_colab_storage(force_sqlite=args.use_sqlite)
 
     # Connect Observability
     start_colab_observability_bridge(watchdog)
