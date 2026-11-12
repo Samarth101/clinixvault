@@ -461,6 +461,7 @@ def main():
     parser.add_argument("--hf-org", type=str, default="ClinixVault", help="Hugging Face Org / Username")
     parser.add_argument("--port", type=int, default=8000, help="Port to bind the API Gateway")
     parser.add_argument("--whisper-model", type=str, default="large-v3-turbo", help="Whisper ASR model size")
+    parser.add_argument("--setup-dbs", action="store_true", help="Automatically install and run PostgreSQL and Neo4j inside Colab")
     parser.add_argument("--sync-git", action="store_true", help="Sync latest code from Git and exit")
     parser.add_argument("--no-tunnel", action="store_true", help="Do not start Cloudflare tunnel")
 
@@ -469,6 +470,12 @@ def main():
     if args.sync_git:
         sync_codebase_from_git()
         return
+
+    if args.setup_dbs:
+        db_script = PROJECT_ROOT / "colab" / "setup_databases.sh"
+        if db_script.exists():
+            print(f"{CYAN}🔧 Running database provisioner (PostgreSQL + Neo4j)...{RESET}")
+            subprocess.run(["bash", str(db_script)], check=False)
 
     print(f"{BLUE}{BOLD}")
     print(r"""
