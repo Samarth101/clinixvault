@@ -75,5 +75,15 @@ class ServiceSettings(BaseModel):
     ENABLE_CRYPTO_PROVENANCE: bool = Field(default_factory=lambda: os.getenv("ENABLE_CRYPTO_PROVENANCE", "true").lower() == "true")
     AUDIT_STORAGE_PATH: str = Field(default_factory=lambda: os.getenv("AUDIT_STORAGE_PATH", "./vault_audit_records"))
 
+    # Colab / Remote Inference URL
+    COLAB_BACKEND_URL: str = Field(default_factory=lambda: os.getenv("COLAB_BACKEND_URL", ""))
+
+    @property
+    def is_showcase(self) -> bool:
+        """True when running in showcase/demo mode (Railway, Fly.io, Colab gateway-only).
+        In this mode heavy model weights are NOT loaded — VLM/LLM routing falls through
+        to the Colab tunnel URL or returns a graceful 503."""
+        return self.ENVIRONMENT.lower() == "showcase"
+
 
 settings = ServiceSettings()

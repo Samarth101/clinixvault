@@ -28,19 +28,15 @@ export function getApiBaseUrl(): string {
   if (typeof window !== 'undefined') {
     const saved = localStorage.getItem('clinixvault_api_url');
     if (saved && saved.trim()) {
-      const clean = saved.trim().replace(/\/+$/, '');
-      // Purge obsolete/expired tunnel URLs
-      if (!clean.includes('consistent-testimonials')) {
-        return clean;
-      }
-      localStorage.removeItem('clinixvault_api_url');
+      return saved.trim().replace(/\/+$/, '');
     }
   }
   const envUrl = import.meta.env.VITE_API_URL;
   if (envUrl !== undefined && envUrl !== '') {
     return envUrl.trim().replace(/\/+$/, '');
   }
-  return 'https://barry-cake-sugar-elizabeth.trycloudflare.com';
+  // No env URL set — fall back to local gateway
+  return 'http://127.0.0.1:8000';
 }
 
 export function setApiBaseUrl(url: string): void {
