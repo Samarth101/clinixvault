@@ -19,7 +19,14 @@ from starlette.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
 from backend.database.connection import get_db, SessionLocal
-from backend.database.models import ClinicalReport, ProvenanceRecord, Patient, Encounter
+from backend.database.models import (
+    ClinicalReport,
+    ProvenanceRecord,
+    Patient,
+    Encounter,
+    ensure_patient_exists,
+    ensure_encounter_exists,
+)
 from backend.gateway.schemas.requests import (
     GatewayRadiologyRequest,
     GatewayRadiologyResponse,
@@ -168,9 +175,9 @@ async def generate_radiology_report(
     print(f"║ Clinical Indication: {str(request.clinical_indication or 'Stat evaluation')[:59]:<59} ║")
     print(f"╚══════════════════════════════════════════════════════════════════════════════════╝", flush=True)
 
-    # Verify patient exists or link to existing cohort patient
-    patient = db.query(Patient).filter((Patient.id == request.patient_id) | (Patient.mrn == request.patient_id)).first()
-    target_patient_id = patient.id if patient else request.patient_id
+    # Verify patient exists or auto-provision to satisfy relational foreign key constraints
+    patient = ensure_patient_exists(db, request.patient_id)
+    target_patient_id = patient.id
 
     findings = ""
     impression = ""
@@ -315,11 +322,12 @@ async def generate_radiology_report(
         signer_id=f"user-{user.get('sub', 'physician')}",
     )
 
-    # Persist in DB
+    # Persist in DB with strict relational foreign key guarantees
     target_patient_id = patient.id if patient else request.patient_id
+    target_encounter_id = ensure_encounter_exists(db, request.encounter_id, target_patient_id)
     report_record = ClinicalReport(
         patient_id=target_patient_id,
-        encounter_id=request.encounter_id,
+        encounter_id=target_encounter_id,
         report_type="radiology",
         title=f"Chest Radiograph {request.projection}",
         findings=findings,
@@ -329,20 +337,29 @@ async def generate_radiology_report(
         model_version=model_version,
         provenance_hash=provenance_manifest["content_sha256"],
     )
-    db.add(report_record)
-    db.commit()
-    db.refresh(report_record)
+    try:
+        db.add(report_record)
+        db.commit()
+        db.refresh(report_record)
+    except Exception as db_save_err:
+        db.rollback()
+        logger.error(f"Failed to persist ClinicalReport to database: {db_save_err}")
 
-    prov_record = ProvenanceRecord(
-        report_id=report_record.id,
-        cryptographic_signature=provenance_manifest["cryptographic_signature"],
-        content_sha256=provenance_manifest["content_sha256"],
-        model_weights_hash=provenance_manifest["model_weights_hash"],
-        signer_identity=provenance_manifest["signer_identity"],
-        evidence_manifest=provenance_manifest,
-    )
-    db.add(prov_record)
-    db.commit()
+    if report_record.id:
+        try:
+            prov_record = ProvenanceRecord(
+                report_id=report_record.id,
+                cryptographic_signature=provenance_manifest["cryptographic_signature"],
+                content_sha256=provenance_manifest["content_sha256"],
+                model_weights_hash=provenance_manifest["model_weights_hash"],
+                signer_identity=provenance_manifest["signer_identity"],
+                evidence_manifest=provenance_manifest,
+            )
+            db.add(prov_record)
+            db.commit()
+        except Exception as prov_err:
+            db.rollback()
+            logger.warning(f"Provenance record persistence warning: {prov_err}")
 
     # Synchronize into Clinical Knowledge Graph (Neo4j / In-Memory with Bi-Temporal Linking)
     try:

@@ -511,6 +511,54 @@ def configure_colab_storage(force_sqlite: bool = False):
         print(f"{YELLOW}[{now_ist_str()}] 🕸️ [GRAPH STORE] In-Memory Clinical Knowledge Graph active.{RESET}")
 
 
+def ensure_cuda_and_vlm_dependencies():
+    """
+    Auto-provisions essential Colab CUDA and VLM dependencies:
+    - qwen-vl-utils (for Qwen2-VL multimodal inference)
+    - nvidia-cublas-cu12, nvidia-cudnn-cu12 (for faster-whisper CTranslate2 CUDA runtime)
+    Also ensures dynamic linker discovery and preloading of cuBLAS libraries.
+    """
+    is_colab = os.path.exists("/content") or "COLAB_GPU" in os.environ
+    to_install = []
+
+    try:
+        import qwen_vl_utils
+    except ImportError:
+        to_install.append("qwen-vl-utils>=0.0.8")
+
+    try:
+        import torch
+        if torch.cuda.is_available() and is_colab:
+            try:
+                import nvidia.cublas
+            except ImportError:
+                to_install.append("nvidia-cublas-cu12")
+            try:
+                import nvidia.cudnn
+            except ImportError:
+                to_install.append("nvidia-cudnn-cu12")
+    except Exception:
+        pass
+
+    if to_install:
+        print(f"{CYAN}📦 Installing essential Colab runtime dependencies: {' '.join(to_install)}...{RESET}")
+        try:
+            subprocess.run(
+                [sys.executable, "-m", "pip", "install", "--quiet"] + to_install,
+                check=False,
+            )
+            print(f"{GREEN}✓ Colab runtime dependencies installed successfully.{RESET}")
+        except Exception as e:
+            print(f"{YELLOW}⚠️ Dependency install note: {e}{RESET}")
+
+    # Discover and preload CUDA libraries into LD_LIBRARY_PATH
+    try:
+        from inference.audio_server.transcriber import configure_cuda_cublas_libraries
+        configure_cuda_cublas_libraries()
+    except Exception:
+        pass
+
+
 # ============================================================================
 # 6. Main Orchestrator
 # ============================================================================
@@ -548,6 +596,9 @@ def main():
     os.environ["WHISPER_COMPUTE_TYPE"] = "float16"
     os.environ["GATEWAY_PORT"] = str(args.port)
     os.environ["GATEWAY_HOST"] = "0.0.0.0"
+
+    # Verify and provision CUDA runtime & VLM dependencies
+    ensure_cuda_and_vlm_dependencies()
 
     # Start GPU VRAM Watchdog
     watchdog = ColabGPUWatchdog(interval_sec=4)

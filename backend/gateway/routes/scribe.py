@@ -19,7 +19,7 @@ from starlette.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
 from backend.database.connection import SessionLocal
-from backend.database.models import ClinicalReport, Patient
+from backend.database.models import ClinicalReport, Patient, ensure_patient_exists
 from backend.gateway.schemas.requests import (
     CodingExtractionRequest,
     CodingExtractionResponse,
@@ -154,6 +154,9 @@ async def scribe_websocket_stream(websocket: WebSocket):
     try:
         while True:
             message = await websocket.receive()
+            if message.get("type") == "websocket.disconnect":
+                logger.info("Ambient scribe WebSocket client disconnected.")
+                break
 
             if "text" in message and message["text"]:
                 payload = json.loads(message["text"])
@@ -298,11 +301,12 @@ async def scribe_websocket_stream(websocket: WebSocket):
                         signer_id="edge-scribe-agent",
                     )
 
-                    # Save in DB
+                    # Save in DB with guaranteed foreign key satisfaction
                     try:
                         db = SessionLocal()
+                        patient_rec = ensure_patient_exists(db, patient_id)
                         report_rec = ClinicalReport(
-                            patient_id=patient_id,
+                            patient_id=patient_rec.id,
                             report_type="soap",
                             title="Ambient Clinical SOAP Note",
                             findings=soap_res.get("soap_note", {}).get("objective", ""),
@@ -454,7 +458,13 @@ async def scribe_websocket_stream(websocket: WebSocket):
                 await websocket.send_json(ack_payload)
 
     except WebSocketDisconnect:
-        logger.info("Ambient scribe WebSocket client disconnected.")
+        logger.info("Ambient scribe WebSocket client disconnected cleanly.")
+    except RuntimeError as re:
+        err_msg = str(re).lower()
+        if "disconnect message has been received" in err_msg or "cannot call \"receive\"" in err_msg or "websocket.close" in err_msg:
+            logger.info("Ambient scribe WebSocket connection closed.")
+        else:
+            logger.error(f"Scribe WebSocket runtime error: {re}")
     except Exception as e:
         logger.error(f"Scribe WebSocket processing error: {e}")
         try:

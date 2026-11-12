@@ -17,7 +17,12 @@ from inference.shared.clinical_sufficiency import is_clinically_sufficient
 
 
 from backend.database.connection import get_db
-from backend.database.models import ClinicalReport, Patient
+from backend.database.models import (
+    ClinicalReport,
+    Patient,
+    ensure_patient_exists,
+    ensure_encounter_exists,
+)
 from backend.database.vector_store import vector_store
 from backend.gateway.schemas.requests import (
     GatewaySummarizeRequest,
@@ -168,13 +173,10 @@ async def summarize_clinical_text(
 ):
     start_time = time.time()
 
-    # Ensure patient exists or link to active cohort patient
-    patient = None
-    if request.patient_id:
-        patient = db.query(Patient).filter((Patient.id == request.patient_id) | (Patient.mrn == request.patient_id)).first()
-    if not patient:
-        patient = db.query(Patient).order_by(Patient.created_at.asc()).first()
-    target_patient_id = patient.id if patient else (request.patient_id or "ANONYMOUS")
+    # Ensure patient exists or provision to satisfy relational foreign key constraints
+    patient = ensure_patient_exists(db, request.patient_id)
+    target_patient_id = patient.id
+    target_encounter_id = ensure_encounter_exists(db, request.encounter_id, target_patient_id)
 
     summary_text = ""
     key_findings = []
@@ -318,7 +320,7 @@ async def summarize_clinical_text(
     report_record = ClinicalReport(
         id=report_id,
         patient_id=target_patient_id,
-        encounter_id=request.encounter_id,
+        encounter_id=target_encounter_id,
         report_type="summary",
         title=f"Clinical {request.summary_type.title()} Summary",
         findings="\n".join(key_findings),
@@ -329,7 +331,11 @@ async def summarize_clinical_text(
         provenance_hash=prov_manifest["content_sha256"],
     )
     db.add(report_record)
-    db.commit()
+    try:
+        db.commit()
+    except Exception as db_err:
+        db.rollback()
+        logger.warning(f"Clinical summary DB persistence error: {db_err}")
 
     # Index into Vector Store for semantic clinical search / RAG
     try:
@@ -474,13 +480,10 @@ async def summarize_clinical_document(
     """
     start_time = time.time()
 
-    # Ensure patient exists or link to active cohort patient
-    patient = None
-    if request.patient_id:
-        patient = db.query(Patient).filter((Patient.id == request.patient_id) | (Patient.mrn == request.patient_id)).first()
-    if not patient:
-        patient = db.query(Patient).order_by(Patient.created_at.asc()).first()
-    target_patient_id = patient.id if patient else (request.patient_id or "ANONYMOUS")
+    # Ensure patient exists or provision to satisfy relational foreign key constraints
+    patient = ensure_patient_exists(db, request.patient_id)
+    target_patient_id = patient.id
+    target_encounter_id = ensure_encounter_exists(db, request.encounter_id, target_patient_id)
 
     extracted_text = ""
     sections = {}
@@ -669,7 +672,7 @@ async def summarize_clinical_document(
     report_record = ClinicalReport(
         id=report_id,
         patient_id=target_patient_id,
-        encounter_id=request.encounter_id,
+        encounter_id=target_encounter_id,
         report_type="document_summary",
         title=f"Clinical Document {request.summary_type.title()} Summary",
         findings="\n".join(key_findings),

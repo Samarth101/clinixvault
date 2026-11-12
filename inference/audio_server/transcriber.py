@@ -31,6 +31,108 @@ except Exception:
     pass
 
 
+def configure_cuda_cublas_libraries():
+    """
+    CTranslate2 / faster-whisper dynamically links against libcublas.so.12 and libcudnn.
+    In Python environments (such as Google Colab or pip nvidia-*-cu12 wheels), these
+    shared libraries reside in Python site-packages (e.g. nvidia/cublas/lib).
+    This function discovers those directories, adds them to os.environ['LD_LIBRARY_PATH'],
+    and preloads libcublasLt.so.12, libcublas.so.12, and libcudnn.so with ctypes.RTLD_GLOBAL
+    so CTranslate2's dlopen can immediately resolve them without library-not-found errors.
+    """
+    if sys.platform != "linux":
+        return
+
+    import glob
+    import ctypes
+
+    discovered_dirs = []
+
+    # 1. Discover via installed nvidia wheels
+    nvidia_modules = [
+        "nvidia.cublas",
+        "nvidia.cudnn",
+        "nvidia.cuda_runtime",
+        "nvidia.cuda_nvrtc",
+    ]
+    for mod_name in nvidia_modules:
+        try:
+            mod = __import__(mod_name, fromlist=["__file__"])
+            if hasattr(mod, "__file__") and mod.__file__:
+                lib_dir = os.path.join(os.path.dirname(mod.__file__), "lib")
+                if os.path.isdir(lib_dir):
+                    discovered_dirs.append(lib_dir)
+        except Exception:
+            pass
+
+    # 2. Discover via site-packages
+    try:
+        import site
+        s_dirs = list(site.getsitepackages()) if hasattr(site, "getsitepackages") else []
+        if hasattr(site, "getusersitepackages"):
+            s_dirs.append(site.getusersitepackages())
+        for sd in s_dirs:
+            discovered_dirs.extend(glob.glob(os.path.join(sd, "nvidia", "*", "lib")))
+            discovered_dirs.extend(glob.glob(os.path.join(sd, "torch", "lib")))
+    except Exception:
+        pass
+
+    # 3. Discover via system CUDA paths
+    discovered_dirs.extend(glob.glob("/usr/local/cuda*/lib64"))
+    discovered_dirs.extend(glob.glob("/usr/local/cuda*/targets/x86_64-linux/lib"))
+    discovered_dirs.extend(glob.glob("/usr/lib/x86_64-linux-gnu"))
+
+    valid_dirs = []
+    seen = set()
+    for d in discovered_dirs:
+        if d and os.path.isdir(d) and d not in seen:
+            seen.add(d)
+            valid_dirs.append(d)
+
+    # Prepend valid library dirs to LD_LIBRARY_PATH
+    if valid_dirs:
+        curr_ld = os.environ.get("LD_LIBRARY_PATH", "")
+        new_ld = ":".join(valid_dirs + ([curr_ld] if curr_ld else []))
+        os.environ["LD_LIBRARY_PATH"] = new_ld
+
+    # 4. Explicitly preload key shared libraries into the process with RTLD_GLOBAL
+    # (Note: libcublas requires libcublasLt, so preload libcublasLt FIRST)
+    shared_libs = [
+        "libcudart.so.12",
+        "libcudart.so.11",
+        "libcublasLt.so.12",
+        "libcublas.so.12",
+        "libcublasLt.so.11",
+        "libcublas.so.11",
+        "libcudnn.so.9",
+        "libcudnn.so.8",
+    ]
+
+    for lib_name in shared_libs:
+        loaded = False
+        for dir_path in valid_dirs:
+            cand = os.path.join(dir_path, lib_name)
+            if os.path.isfile(cand):
+                try:
+                    ctypes.CDLL(cand, mode=ctypes.RTLD_GLOBAL)
+                    loaded = True
+                    break
+                except Exception:
+                    pass
+        if not loaded:
+            try:
+                ctypes.CDLL(lib_name, mode=ctypes.RTLD_GLOBAL)
+            except Exception:
+                pass
+
+
+# Execute CUDA library setup at module load
+try:
+    configure_cuda_cublas_libraries()
+except Exception:
+    pass
+
+
 WHISPER_SILENCE_HALLUCINATIONS = {
     "thank you", "thank you.", "thank you very much", "thank you very much.",
     "thank you for watching", "thank you for watching.", "thanks for watching",
@@ -123,16 +225,42 @@ class WhisperTranscriber:
                 )
                 self.model_size = "small.en"
 
+            try:
+                configure_cuda_cublas_libraries()
+            except Exception:
+                pass
+
             device = "cuda" if settings.WHISPER_DEVICE == "cuda" else "cpu"
             compute_type = "float16" if device == "cuda" else "int8"
+            self.device = device
+            self.compute_type = compute_type
             logger.info(f"Loading faster-whisper model '{self.model_size}' on {device} ({compute_type})...")
             
-            self.model = WhisperModel(
-                self.model_size,
-                device=device,
-                compute_type=compute_type,
-                cpu_threads=settings.LLM_N_THREADS,
-            )
+            try:
+                self.model = WhisperModel(
+                    self.model_size,
+                    device=device,
+                    compute_type=compute_type,
+                    cpu_threads=settings.LLM_N_THREADS,
+                )
+            except Exception as init_err:
+                if device == "cuda":
+                    logger.warning(
+                        f"🚨 Faster-Whisper failed to initialize on CUDA ({init_err}). "
+                        f"Automatically falling back to CPU int8 runtime."
+                    )
+                    self.device = "cpu"
+                    self.compute_type = "int8"
+                    cpu_init_size = "small.en" if "large" in self.model_size.lower() else self.model_size
+                    self.model_size = cpu_init_size
+                    self.model = WhisperModel(
+                        cpu_init_size,
+                        device="cpu",
+                        compute_type="int8",
+                        cpu_threads=settings.LLM_N_THREADS,
+                    )
+                else:
+                    raise init_err
 
             # Post-load memory check
             post_safe, post_pct, post_avail = self._check_memory_safety()
@@ -147,8 +275,8 @@ class WhisperTranscriber:
                 self.model_size = "small.en"
                 self.model = WhisperModel(
                     self.model_size,
-                    device=device,
-                    compute_type=compute_type,
+                    device=self.device,
+                    compute_type=self.compute_type,
                     cpu_threads=settings.LLM_N_THREADS,
                 )
 
@@ -190,12 +318,11 @@ class WhisperTranscriber:
             if initial_prompt:
                 transcribe_kwargs["initial_prompt"] = initial_prompt
 
-            try:
-                segments_generator, info = self.model.transcribe(
+            def _parse_and_collect_segments(model_to_use):
+                segments_generator, info = model_to_use.transcribe(
                     audio_path,
                     **transcribe_kwargs,
                 )
-
                 results = []
                 full_parts = []
                 for seg in segments_generator:
@@ -225,16 +352,44 @@ class WhisperTranscriber:
                         }
                     )
                     full_parts.append(seg_text)
+                return results, full_parts, info
 
-                raw_full = " ".join(full_parts).strip()
-                full_text = _clean_hallucinatory_repetitions(raw_full)
-                if full_text.strip(".,!?\"'").lower() in WHISPER_SILENCE_HALLUCINATIONS:
-                    return "", [], info.duration, info.language
-
-                return full_text, results, info.duration, info.language
+            try:
+                results, full_parts, info = _parse_and_collect_segments(self.model)
             except Exception as e:
-                logger.warning(f"Audio transcription execution failed ({e}). Returning empty transcription.")
-                return "", [], 0.0, language or "en"
+                err_str = str(e).lower()
+                is_gpu_err = any(cue in err_str for cue in ("libcublas", "cuda", "cublas", "cudnn", "gpu", "out of memory"))
+                if getattr(self, "device", "cpu") == "cuda" or is_gpu_err:
+                    logger.warning(
+                        f"🚨 Faster-Whisper CUDA runtime error ({e}). "
+                        f"Dynamically migrating to CPU int8 runtime for uninterrupted speech recognition..."
+                    )
+                    try:
+                        from faster_whisper import WhisperModel
+                        self.device = "cpu"
+                        self.compute_type = "int8"
+                        cpu_size = "small.en" if "large" in self.model_size.lower() else self.model_size
+                        self.model = WhisperModel(
+                            cpu_size,
+                            device="cpu",
+                            compute_type="int8",
+                            cpu_threads=max(2, min(4, os.cpu_count() or 2)),
+                        )
+                        self.model_size = cpu_size
+                        results, full_parts, info = _parse_and_collect_segments(self.model)
+                    except Exception as fallback_err:
+                        logger.warning(f"Audio transcription CPU fallback execution failed ({fallback_err}). Returning empty transcription.")
+                        return "", [], 0.0, language or "en"
+                else:
+                    logger.warning(f"Audio transcription execution failed ({e}). Returning empty transcription.")
+                    return "", [], 0.0, language or "en"
+
+            raw_full = " ".join(full_parts).strip()
+            full_text = _clean_hallucinatory_repetitions(raw_full)
+            if full_text.strip(".,!?\"'").lower() in WHISPER_SILENCE_HALLUCINATIONS:
+                return "", [], info.duration, info.language
+
+            return full_text, results, info.duration, info.language
 
         # When no neural model is available or audio is silent, return empty without hallucination
         return "", [], 0.0, "en"

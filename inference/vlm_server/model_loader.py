@@ -447,7 +447,17 @@ class VLMModelRunner:
                 vlm_img = prepare_vlm_image(image, max_dim=1024)
 
                 if "qwen" in self.model_path.lower():
-                    from qwen_vl_utils import process_vision_info
+                    try:
+                        from qwen_vl_utils import process_vision_info
+                    except Exception:
+                        def process_vision_info(conversations, **kwargs):
+                            image_inputs = []
+                            conv_list = [conversations] if isinstance(conversations, dict) else conversations
+                            for m in conv_list:
+                                for c in m.get("content", []):
+                                    if isinstance(c, dict) and c.get("type") == "image":
+                                        image_inputs.append(c.get("image"))
+                            return image_inputs or None, None
                     print(f"[VLM INFERENCE] 🧠 Executing Stage 1 Anatomical Findings with Qwen2-VL on {self.device}...")
                     msg1 = [{"role": "user", "content": [{"type": "image", "image": vlm_img}, {"type": "text", "text": stage1_prompt}]}]
                     text1 = self.processor.apply_chat_template(msg1, tokenize=False, add_generation_prompt=True)
