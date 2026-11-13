@@ -74,6 +74,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Private Network Access (PNA) header support for Chrome (e.g. Vercel HTTPS -> Localhost HTTP)
+@app.middleware("http")
+async def private_network_access_middleware(request, call_next):
+    if request.method == "OPTIONS":
+        response = await call_next(request)
+        response.headers["Access-Control-Allow-Private-Network"] = "true"
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "*"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+        return response
+    response = await call_next(request)
+    response.headers["Access-Control-Allow-Private-Network"] = "true"
+    return response
+
 # Custom Middlewares
 app.add_middleware(AuditLoggingMiddleware)
 app.add_middleware(RateLimiterMiddleware, requests_per_minute=settings.RATE_LIMIT_PER_MINUTE)

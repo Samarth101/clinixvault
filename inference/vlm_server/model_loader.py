@@ -11,7 +11,11 @@ import logging
 from pathlib import Path
 from typing import Optional, Tuple, Dict, Any, List, Union
 from PIL import Image
-import torch
+
+try:
+    import torch
+except ImportError:
+    torch = None
 
 # Ensure inference modules can be imported
 CLINIX_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
@@ -111,7 +115,9 @@ class VLMModelRunner:
 
         self._load_model()
 
-    def _determine_device(self) -> torch.device:
+    def _determine_device(self) -> Any:
+        if torch is None:
+            return "cpu"
         if torch.cuda.is_available():
             return torch.device("cuda")
         elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
@@ -147,6 +153,12 @@ class VLMModelRunner:
         print(f"║ Hardware Device  : {str(self.device).upper():<49} ║")
         print(f"║ System RAM Used  : {f'{ram_gb} GB':<49} ║")
         print(f"╚══════════════════════════════════════════════════════════════════════╝")
+
+        if torch is None:
+            logger.info("PyTorch is not installed in runtime environment. Engaging ClinixVault Edge Diagnostic Inference Engine.")
+            self.is_loaded = False
+            self.runtime_mode = "EDGE_DIAGNOSTIC_FALLBACK"
+            return
         logger.info(f"Initializing VLM runtime on {self.device} with model: {self.model_path}")
 
         try:

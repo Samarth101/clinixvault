@@ -68,6 +68,9 @@ services:
       - DOCUMENT_URL=http://document-server:8004
       - CORS_ALLOW_ALL=true
       - OLLAMA_HOST=http://host.docker.internal:11434
+      - HOST_CHIP=Apple Silicon (M-Series)
+      - HOST_ACCELERATOR=Apple Metal (MPS) / Ollama
+      - HOST_OS=Darwin
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:

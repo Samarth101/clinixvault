@@ -29,31 +29,44 @@ def get_hardware_specs() -> Dict[str, Any]:
     gpu_name = chip_name
     memory_type = "System RAM"
 
-    # 1. macOS / Darwin Auto-Detection
-    if plat == "darwin":
-        try:
-            brand = subprocess.check_output(
-                ["sysctl", "-n", "machdep.cpu.brand_string"],
-                stderr=subprocess.DEVNULL,
-            ).decode().strip()
-            if brand:
-                chip_name = brand
-        except Exception:
-            pass
+    # Check for Docker container running on macOS / Apple Silicon host
+    is_docker_mac = False
+    try:
+        release_str = os.uname().release.lower() if hasattr(os, "uname") else ""
+        if "linuxkit" in release_str or os.getenv("HOST_OS") == "Darwin" or "host.docker.internal" in os.getenv("OLLAMA_HOST", ""):
+            if platform.machine() in ("aarch64", "arm64") or os.getenv("HOST_CHIP"):
+                is_docker_mac = True
+    except Exception:
+        pass
 
-        is_apple_silicon = "Apple" in chip_name or platform.machine() == "arm64"
+    # 1. macOS / Darwin Auto-Detection (Host or Docker on Mac)
+    if plat == "darwin" or is_docker_mac:
+        if plat == "darwin":
+            try:
+                brand = subprocess.check_output(
+                    ["sysctl", "-n", "machdep.cpu.brand_string"],
+                    stderr=subprocess.DEVNULL,
+                ).decode().strip()
+                if brand:
+                    chip_name = brand
+            except Exception:
+                pass
+        else:
+            chip_name = os.getenv("HOST_CHIP") or "Apple Silicon (M-Series)"
+
+        is_apple_silicon = "Apple" in chip_name or platform.machine() in ("arm64", "aarch64")
         if is_apple_silicon:
             memory_type = "Unified Memory"
-            gpu_name = f"{chip_name} (Unified)"
-            accelerator = "Apple Metal (MPS)"
+            gpu_name = f"{chip_name} (Metal Unified)"
+            accelerator = os.getenv("HOST_ACCELERATOR") or "Apple Metal (MPS) / Ollama"
             try:
                 import torch
                 if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
                     accelerator = "Apple Metal (MPS)"
                 else:
-                    accelerator = "Apple Neural Engine / Metal"
+                    accelerator = "Apple Metal (MPS) / Ollama"
             except Exception:
-                accelerator = "Apple Metal (MPS)"
+                accelerator = "Apple Metal (MPS) / Ollama"
         else:
             accelerator = "macOS CPU"
             gpu_name = f"{chip_name}"

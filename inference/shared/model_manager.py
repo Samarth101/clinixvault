@@ -878,8 +878,7 @@ class ModelManager:
         falling back seamlessly to local Two-Stage Hierarchical Florence-2 / Qwen2-VL engine.
         Returns: RadiologyInferenceResult (unpacks as findings, impression, full_report, model_version)
         """
-        from inference.vlm_server.model_loader import (
-            get_vlm_runner,
+        from inference.shared.critic import (
             synthesize_compartmental_breakdown,
             parse_compartments_from_findings,
             audit_and_reconcile_report,
@@ -1003,6 +1002,7 @@ class ModelManager:
 
         # 2. Sovereign Local Two-Stage Hierarchical VLM Runner (Qwen2-VL / Florence-2 / SmolVLM)
         print(f"\n[MODEL MANAGER] 🎯 Dispatching radiology inference to runner for model: {target_model}")
+        from inference.vlm_server.model_loader import get_vlm_runner
         runner = get_vlm_runner(target_model)
         print(f"[MODEL MANAGER] Runner Active: {runner.is_loaded} | Runtime Mode: {getattr(runner, 'runtime_mode', 'UNKNOWN')} | Device: {runner.device}")
 
