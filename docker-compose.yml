@@ -67,6 +67,9 @@ services:
       - AUDIO_URL=http://audio-server:8003
       - DOCUMENT_URL=http://document-server:8004
       - CORS_ALLOW_ALL=true
+      - OLLAMA_HOST=http://host.docker.internal:11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       db:
         condition: service_healthy
