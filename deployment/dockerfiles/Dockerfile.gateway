@@ -1,70 +1,59 @@
 # ==============================================================================
-# Multi-Stage Dockerfile for ClinixVault API Gateway
-# Stage 1: Build virtual environment and compile C++ native inference accelerator
-# Stage 2: Hardened, non-root minimal runtime image with healthcheck probe
+# Multi-Stage Dockerfile for ClinixVault API Gateway (Fast & Hardened)
+# Zero apt-get bloat: uses pre-compiled wheels & Python native healthcheck
 # ==============================================================================
 
-# ----------------- Stage 1: Build & Compilation Stage -----------------
-FROM python:3.11-slim AS builder
+# ----------------- Stage 1: Build & Wheel Installation -----------------
+FROM python:3.11-slim-bookworm AS builder
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    libpq-dev \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Create dedicated virtual environment for isolated artifact transfer
+# Dedicated virtual environment
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-COPY pyproject.toml /app/
+# Install core runtime dependencies via pre-compiled binary wheels
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir \
+    pip install --no-cache-dir --default-timeout=100 \
     fastapi>=0.110.0 \
-    uvicorn>=0.28.0 \
+    uvicorn[standard]>=0.28.0 \
     pydantic>=2.6.0 \
     sqlalchemy>=2.0.28 \
     psycopg2-binary>=2.9.9 \
+    alembic>=1.13.0 \
+    neo4j>=5.18.0 \
+    networkx>=3.0 \
     httpx>=0.27.0 \
     psutil>=5.9.8 \
     numpy>=1.26.0 \
+    pillow>=10.2.0 \
+    pypdf>=4.0.0 \
     pydicom>=2.4.4 \
     python-jose[cryptography]>=3.3.0 \
     passlib>=1.7.4 \
     bcrypt>=4.1.2 \
-    websockets>=12.0
-
-# Compile native C++ inference acceleration kernel
-COPY inference/cpp /app/inference/cpp
-RUN cd /app/inference/cpp && make clean && make
+    websockets>=12.0 \
+    python-multipart>=0.0.9 \
+    aiofiles>=23.2.1
 
 # ----------------- Stage 2: Production Runtime Stage -----------------
-FROM python:3.11-slim AS runner
+FROM python:3.11-slim-bookworm AS runner
 
 WORKDIR /app
 
-# Install minimal runtime dependencies (libpq5 for PostgreSQL and curl for probes)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq5 \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Create unprivileged system user for HIPAA compliance and CIS container benchmark
+# Unprivileged system user for HIPAA compliance and CIS container benchmark
 RUN groupadd -g 10001 clinix && \
     useradd -u 10001 -g clinix -s /bin/bash -m appuser
 
-# Copy virtual environment and pre-compiled native kernels from builder
+# Copy virtual environment from builder
 COPY --from=builder /opt/venv /opt/venv
-COPY --from=builder /app/inference/cpp /app/inference/cpp
 
 ENV PATH="/opt/venv/bin:$PATH"
 ENV PYTHONPATH=/app
 
 # Copy application source code
 COPY backend /app/backend
-COPY inference/shared /app/inference/shared
+COPY inference /app/inference
 
 # Ensure appropriate permissions for non-root execution
 RUN chown -R appuser:clinix /app
@@ -73,8 +62,8 @@ USER appuser
 
 EXPOSE 8000
 
-# Container liveness & readiness healthcheck probe
-HEALTHCHECK --interval=20s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:8000/api/v1/health || exit 1
+# Native Python healthcheck probe (zero apt/curl dependencies)
+HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
+    CMD python3 -c "import urllib.request, sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/v1/health', timeout=4).getcode() == 200 else 1)"
 
 CMD ["uvicorn", "backend.gateway.main:app", "--host", "0.0.0.0", "--port", "8000"]

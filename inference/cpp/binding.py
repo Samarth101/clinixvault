@@ -9,15 +9,21 @@ Provides high-performance native C++ routines for:
 import os
 import sys
 import ctypes
+import warnings
 import numpy as np
 from typing import List, Optional
 
 _dir = os.path.dirname(os.path.abspath(__file__))
-_lib_candidates = [
-    os.path.join(_dir, "libclinix_accel.dylib"),
-    os.path.join(_dir, "libclinix_accel.so"),
-    os.path.join(_dir, "libclinix_accel.dll"),
-]
+
+# Match native dynamic library extensions to current operating system
+if sys.platform == "darwin":
+    _lib_candidates = [os.path.join(_dir, "libclinix_accel.dylib")]
+elif sys.platform.startswith("linux"):
+    _lib_candidates = [os.path.join(_dir, "libclinix_accel.so")]
+elif sys.platform == "win32":
+    _lib_candidates = [os.path.join(_dir, "libclinix_accel.dll")]
+else:
+    _lib_candidates = []
 
 _accel_lib = None
 for c in _lib_candidates:

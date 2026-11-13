@@ -1,28 +1,25 @@
 /**
  * ClinixVault Automated Multi-Provider Failover Agent
  *
- * Tiered GPU & Cloud Gateway Failover Architecture:
+ * Tiered GPU & Edge Architecture:
  * Priority 1: Google Colab GPU Cloud Tunnel (Tesla T4 15GB VRAM — user-provided via frontend)
  * Priority 2: Sovereign Local Edge Node (Apple Silicon MPS / Local Ollama / C++ SIMD)
- * Priority 3: Render Cloud Gateway (https://clinixvault-backend.onrender.com)
  *
  * Failover Rules:
  * - Colab tunnel is dynamically provided via frontend (no hardcoded URLs).
- * - Priority order: Colab (P1) -> Local Edge (P2) -> Render Cloud Gateway (P3).
+ * - Priority order: Colab GPU (P1) -> Sovereign Local Edge Node (P2).
  * - If Colab drops 3 consecutive heartbeats or is unconfigured:
- *   -> Probes Priority 2 (Local Edge Node).
- *   -> If Local Edge is offline or unreachable (e.g. browsing from Vercel WAN),
- *      seamlessly falls back to Priority 3 (Render Cloud Gateway).
+ *   -> Automatically promotes Priority 2 (Local Edge Node http://127.0.0.1:8000).
  * - Background Promotion:
- *   -> When running on Local Edge or Render, continuously probes Colab in background.
+ *   -> When running on Local Edge, continuously probes Colab in background.
  *   -> As soon as the clinician starts a Colab tunnel and pastes it, or an existing
  *      Colab tunnel recovers, automatically promotes back to Colab GPU!
  */
 
 import { getApiBaseUrl, setApiBaseUrl } from './api';
 
-export type NodeTarget = 'colab' | 'render' | 'local';
-export type NodeStatus = 'colab' | 'render' | 'local' | 'offline';
+export type NodeTarget = 'colab' | 'local';
+export type NodeStatus = 'colab' | 'local' | 'offline';
 
 export interface HeartbeatLog {
   timestamp: number;
@@ -37,14 +34,12 @@ export interface FailoverState {
   activeNode: NodeStatus;
   currentUrl: string;
   colabUrl: string;
-  renderUrl: string;
   localUrl: string;
   isAutoFailoverEnabled: boolean;
   consecutiveFailures: number;
   latencyMs: number;
   lastHeartbeatAt: number;
   colabHealthy: boolean;
-  renderHealthy: boolean;
   localHealthy: boolean;
   recentHeartbeats: HeartbeatLog[];
   lastFailoverReason?: string;
@@ -53,7 +48,6 @@ export interface FailoverState {
 }
 
 const DEFAULT_COLAB_URL = '';
-const DEFAULT_RENDER_URL = 'https://clinixvault-backend.onrender.com';
 const DEFAULT_LOCAL_URL = 'http://127.0.0.1:8000';
 
 const LATENCY_FAILOVER_THRESHOLD_MS = 6000;
@@ -63,7 +57,6 @@ const PROBE_TIMEOUT_MS = 6500;
 
 class NodeFailoverAgent {
   private colabUrl: string = DEFAULT_COLAB_URL;
-  private renderUrl: string = DEFAULT_RENDER_URL;
   private localUrl: string = DEFAULT_LOCAL_URL;
 
   private isAutoFailoverEnabled: boolean = true;
@@ -74,7 +67,6 @@ class NodeFailoverAgent {
   private lastHeartbeatAt: number = 0;
 
   private colabHealthy: boolean = false;
-  private renderHealthy: boolean = false;
   private localHealthy: boolean = false;
 
   private recentHeartbeats: HeartbeatLog[] = [];
@@ -98,11 +90,6 @@ class NodeFailoverAgent {
       this.colabUrl = savedColab.trim().replace(/\/+$/, '');
     }
 
-    const savedRender = localStorage.getItem('clinixvault_render_url');
-    if (savedRender && savedRender.trim()) {
-      this.renderUrl = savedRender.trim().replace(/\/+$/, '');
-    }
-
     const savedLocal = localStorage.getItem('clinixvault_local_url');
     if (savedLocal && savedLocal.trim()) {
       this.localUrl = savedLocal.trim().replace(/\/+$/, '');
@@ -116,21 +103,11 @@ class NodeFailoverAgent {
 
   private detectInitialNode(): void {
     const current = getApiBaseUrl();
-    if (current && (current.includes('127.0.0.1') || current.includes('localhost'))) {
-      this.activeNode = 'local';
-    } else if (current && current.includes('onrender.com')) {
-      this.activeNode = 'render';
-      this.renderUrl = current;
-    } else if (current && (current.includes('trycloudflare.com') || (this.colabUrl && current === this.colabUrl))) {
+    if (current && (current.includes('trycloudflare.com') || (this.colabUrl && current === this.colabUrl))) {
       this.activeNode = 'colab';
       this.colabUrl = current;
     } else {
-      // If running on HTTPS deployment (e.g. Vercel) and no explicit URL configured:
-      if (typeof window !== 'undefined' && window.location.protocol === 'https:' && !window.location.hostname.includes('localhost')) {
-        this.activeNode = 'render';
-      } else {
-        this.activeNode = 'local';
-      }
+      this.activeNode = 'local';
     }
   }
 
@@ -139,19 +116,17 @@ class NodeFailoverAgent {
       activeNode: this.activeNode,
       currentUrl: getApiBaseUrl(),
       colabUrl: this.colabUrl,
-      renderUrl: this.renderUrl,
       localUrl: this.localUrl,
       isAutoFailoverEnabled: this.isAutoFailoverEnabled,
       consecutiveFailures: this.consecutiveFailures,
       latencyMs: this.currentLatencyMs,
       lastHeartbeatAt: this.lastHeartbeatAt,
       colabHealthy: this.colabHealthy,
-      renderHealthy: this.renderHealthy,
       localHealthy: this.localHealthy,
       recentHeartbeats: [...this.recentHeartbeats],
       lastFailoverReason: this.lastFailoverReason,
       lastFailoverAt: this.lastFailoverAt,
-      gpuPriority: ['colab', 'local', 'render'],
+      gpuPriority: ['colab', 'local'],
     };
   }
 
@@ -196,20 +171,6 @@ class NodeFailoverAgent {
     this.notify();
   }
 
-  public setRenderUrl(url: string): void {
-    const clean = (url || '').trim().replace(/\/+$/, '');
-    if (!clean) return;
-    this.renderUrl = clean;
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('clinixvault_render_url', clean);
-    }
-    if (this.activeNode === 'render') {
-      setApiBaseUrl(clean);
-    }
-    this.notify();
-    void this.triggerHeartbeat();
-  }
-
   public setLocalUrl(url: string): void {
     const clean = (url || '').trim().replace(/\/+$/, '');
     if (!clean) return;
@@ -232,20 +193,26 @@ class NodeFailoverAgent {
     this.notify();
   }
 
+  public clearHeartbeatHistory(): void {
+    this.recentHeartbeats = [];
+    this.notify();
+  }
+
   /**
-   * Probes endpoint with timeout and latency calculation.
+   * Healthcheck probe for a given URL.
    */
   public async probeEndpoint(
-    url: string
-  ): Promise<{ ok: boolean; latencyMs: number; data?: any; error?: string; isTimeout?: boolean }> {
+    url: string,
+    timeoutMs: number = PROBE_TIMEOUT_MS
+  ): Promise<{ ok: boolean; latencyMs: number; error?: string; isTimeout?: boolean; data?: any }> {
     const target = (url || '').trim().replace(/\/+$/, '');
     if (!target) {
-      return { ok: false, latencyMs: 0, error: 'Endpoint not configured' };
+      return { ok: false, latencyMs: 0, error: 'Empty endpoint URL' };
     }
 
     const t0 = performance.now();
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
       const resp = await fetch(`${target}/api/v1/health`, {
@@ -281,8 +248,6 @@ class NodeFailoverAgent {
     const targetNode: NodeTarget =
       this.colabUrl && activeUrl === this.colabUrl
         ? 'colab'
-        : activeUrl === this.renderUrl
-        ? 'render'
         : 'local';
 
     const result = await this.probeEndpoint(activeUrl);
@@ -307,40 +272,35 @@ class NodeFailoverAgent {
     if (result.ok) {
       const wasOffline = this.activeNode === 'offline';
       if (targetNode === 'colab') this.colabHealthy = true;
-      if (targetNode === 'render') this.renderHealthy = true;
       if (targetNode === 'local') this.localHealthy = true;
 
       this.consecutiveFailures = 0;
 
-      if (targetNode === 'render') {
-        this.highLatencyCount = 0;
-      } else if (result.latencyMs > LATENCY_FAILOVER_THRESHOLD_MS && targetNode !== 'local') {
+      if (result.latencyMs > LATENCY_FAILOVER_THRESHOLD_MS && targetNode !== 'local') {
         this.highLatencyCount += 1;
       } else {
         this.highLatencyCount = 0;
       }
 
-      this.activeNode = targetNode;
-
-      if (wasOffline && typeof window !== 'undefined') {
-        window.dispatchEvent(
-          new CustomEvent('clinixvault:backend_recovered', {
-            detail: { node: this.activeNode, url: activeUrl, latencyMs: result.latencyMs },
-          })
+      if (wasOffline) {
+        this.activeNode = targetNode;
+        this.dispatchFailoverEvent(
+          'offline',
+          targetNode,
+          `Node ${targetNode} recovered (${result.latencyMs}ms)`
         );
       }
     } else {
       if (targetNode === 'colab') this.colabHealthy = false;
-      if (targetNode === 'render') this.renderHealthy = false;
       if (targetNode === 'local') this.localHealthy = false;
 
       this.consecutiveFailures += 1;
     }
 
-    // Failover evaluation: Colab (P1) -> Local Edge (P2) -> Render Gateway (P3)
+    // Failover evaluation: Colab (P1) -> Local Edge (P2)
     if (this.isAutoFailoverEnabled) {
       const failureLimit = (result.isTimeout && targetNode === 'local') ? 4 : CONSECUTIVE_FAILURE_THRESHOLD;
-      const shouldTrigger = this.consecutiveFailures >= failureLimit || (targetNode !== 'render' && this.highLatencyCount >= 4);
+      const shouldTrigger = this.consecutiveFailures >= failureLimit;
 
       if (shouldTrigger) {
         const failReason =
@@ -358,7 +318,7 @@ class NodeFailoverAgent {
 
   /**
    * Execute Tiered Failover following strict priority:
-   * Colab (P1) -> Local Edge (P2) -> Render Gateway (P3)
+   * Colab (P1) -> Local Edge (P2)
    */
   private async executeTieredFailover(failedNode: NodeTarget, reason: string): Promise<void> {
     console.warn(`[FailoverAgent] ⚡ Node [${failedNode}] degraded/offline (${reason}). Evaluating fallback tier...`);
@@ -381,15 +341,6 @@ class NodeFailoverAgent {
       }
     }
 
-    // Priority 3: Render Cloud Gateway if not the failed node
-    if (failedNode !== 'render' && this.renderUrl) {
-      const renderProbe = await this.probeEndpoint(this.renderUrl);
-      if (renderProbe.ok) {
-        await this.switchToRender(`Failover from ${failedNode}: Render Cloud Gateway online (${renderProbe.latencyMs}ms)`);
-        return;
-      }
-    }
-
     // If all configured nodes are unreachable
     this.activeNode = 'offline';
     this.lastFailoverReason = `All backend nodes unreachable (${reason})`;
@@ -400,22 +351,23 @@ class NodeFailoverAgent {
    * Switch active node to Colab GPU Cloud Tunnel.
    */
   public async switchToColab(reason?: string, targetUrl?: string): Promise<void> {
-    if (targetUrl) {
-      const clean = targetUrl.trim().replace(/\/+$/, '');
-      if (clean) this.colabUrl = clean;
-    }
-    if (!this.colabUrl) return;
-
     const prev = this.activeNode;
+    const url = (targetUrl || this.colabUrl).trim().replace(/\/+$/, '');
+    if (!url) return;
+
+    this.colabUrl = url;
     this.activeNode = 'colab';
     this.consecutiveFailures = 0;
     this.highLatencyCount = 0;
     this.lastFailoverReason = reason;
     this.lastFailoverAt = Date.now();
 
-    setApiBaseUrl(this.colabUrl);
+    setApiBaseUrl(url);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('clinixvault_colab_url', url);
+    }
     this.notify();
-    this.dispatchFailoverEvent(prev, 'colab', reason || 'Switched to Colab GPU Node');
+    this.dispatchFailoverEvent(prev, 'colab', reason || 'Switched to Colab GPU Tunnel');
   }
 
   /**
@@ -423,51 +375,15 @@ class NodeFailoverAgent {
    */
   public async switchToLocal(reason?: string): Promise<void> {
     const prev = this.activeNode;
-    this.lastFailoverReason = reason;
-    this.lastFailoverAt = Date.now();
     this.activeNode = 'local';
     this.consecutiveFailures = 0;
     this.highLatencyCount = 0;
-
-    setApiBaseUrl(this.localUrl);
-
-    // Switch inference models to local edge models
-    try {
-      await fetch(`${this.localUrl}/api/v1/models/active`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: 'Bearer vault-local-admin-token',
-        },
-        body: JSON.stringify({
-          radiology_model: 'smolvlm-qlora',
-          summarize_model: 'qwen2.5-coder:1.5b',
-        }),
-      });
-    } catch {}
-
-    this.notify();
-    this.dispatchFailoverEvent(prev, 'local', reason || 'Switched to Local Edge Node');
-  }
-
-  /**
-   * Switch active node to Render Cloud Gateway.
-   */
-  public async switchToRender(reason?: string, targetUrl?: string): Promise<void> {
-    if (targetUrl) {
-      const clean = targetUrl.trim().replace(/\/+$/, '');
-      if (clean) this.renderUrl = clean;
-    }
-    const prev = this.activeNode;
-    this.activeNode = 'render';
-    this.consecutiveFailures = 0;
-    this.highLatencyCount = 0;
     this.lastFailoverReason = reason;
     this.lastFailoverAt = Date.now();
 
-    setApiBaseUrl(this.renderUrl);
+    setApiBaseUrl(this.localUrl);
     this.notify();
-    this.dispatchFailoverEvent(prev, 'render', reason || 'Switched to Render Cloud Gateway');
+    this.dispatchFailoverEvent(prev, 'local', reason || 'Switched to Local Edge Node');
   }
 
   /**
@@ -491,33 +407,20 @@ class NodeFailoverAgent {
   }
 
   /**
-   * Background Promotion Probe: checks higher-priority GPU tiers when running on lower tiers.
-   * Priority: Colab (P1) -> Local Edge (P2)
+   * Background Promotion Probe: checks higher-priority GPU tiers when running on local edge.
+   * Priority: Colab (P1)
    */
   private async probeHigherTierRecovery(): Promise<void> {
     if (!this.isAutoFailoverEnabled) return;
 
-    // If running on Local or Render, check if Colab (P1) is configured and back online
-    if (this.activeNode === 'local' || this.activeNode === 'render' || this.activeNode === 'offline') {
+    // If running on Local or Offline, check if Colab (P1) is configured and back online
+    if (this.activeNode === 'local' || this.activeNode === 'offline') {
       if (this.colabUrl) {
         const colabProbe = await this.probeEndpoint(this.colabUrl);
         if (colabProbe.ok && colabProbe.latencyMs < 2500) {
           this.colabHealthy = true;
           console.info(`[FailoverAgent] 🚀 Priority 1 Colab GPU online (${colabProbe.latencyMs}ms). Promoting active node.`);
           await this.switchToColab(`Priority 1 Colab GPU online (${colabProbe.latencyMs}ms)`);
-          return;
-        }
-      }
-    }
-
-    // If running on Render or Offline, check if Local Edge (P2) is online
-    if (this.activeNode === 'render' || this.activeNode === 'offline') {
-      if (this.localUrl) {
-        const localProbe = await this.probeEndpoint(this.localUrl);
-        if (localProbe.ok && localProbe.latencyMs < 1500) {
-          this.localHealthy = true;
-          console.info(`[FailoverAgent] 💻 Priority 2 Local Edge online (${localProbe.latencyMs}ms). Promoting active node.`);
-          await this.switchToLocal(`Priority 2 Local Edge online (${localProbe.latencyMs}ms)`);
           return;
         }
       }
@@ -550,7 +453,7 @@ class NodeFailoverAgent {
   }
 
   /**
-   * Stop heartbeat monitoring.
+   * Stop heartbeat loops.
    */
   public stopHeartbeat(): void {
     if (this.timerId) {
@@ -565,7 +468,3 @@ class NodeFailoverAgent {
 }
 
 export const failoverAgent = new NodeFailoverAgent();
-
-if (typeof window !== 'undefined') {
-  failoverAgent.startHeartbeat();
-}
