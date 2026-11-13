@@ -432,29 +432,25 @@ async def delete_patient(
             (Encounter.patient_id == pid) | (Encounter.patient_id == mrn)
         ).delete(synchronize_session=False)
 
-        # 3. Clean up Clinical Knowledge Graph triples via same session
+        # 3. Clean up Clinical Knowledge Graph triples safely without aborting SQL transaction
         try:
-            from sqlalchemy import text
-            db.execute(text("DELETE FROM graph_nodes WHERE id = :id OR id = :mrn"), {"id": pid, "mrn": mrn})
-            db.execute(text("DELETE FROM graph_edges WHERE source_id = :id OR target_id = :id OR source_id = :mrn OR target_id = :mrn"), {"id": pid, "mrn": mrn})
+            from backend.database.graph_store import get_graph_store
+            store = get_graph_store()
+            if hasattr(store, "manager"):
+                if hasattr(store.manager, "delete_node"):
+                    store.manager.delete_node(pid)
+                    store.manager.delete_node(mrn)
+                elif hasattr(store.manager, "_memory_graph"):
+                    if store.manager._memory_graph.has_node(pid):
+                        store.manager._memory_graph.remove_node(pid)
+                    if store.manager._memory_graph.has_node(mrn):
+                        store.manager._memory_graph.remove_node(mrn)
         except Exception as graph_err:
             logger.debug(f"Graph triple deletion note: {graph_err}")
 
         # 4. Remove patient record
         db.delete(patient)
         db.commit()
-
-        # In-memory graph manager cleanup
-        try:
-            from backend.database.graph_store import get_graph_store
-            store = get_graph_store()
-            if hasattr(store.manager, "_memory_graph"):
-                if store.manager._memory_graph.has_node(pid):
-                    store.manager._memory_graph.remove_node(pid)
-                if store.manager._memory_graph.has_node(mrn):
-                    store.manager._memory_graph.remove_node(mrn)
-        except Exception:
-            pass
 
         # 5. Evict from in-memory cache
         DYNAMIC_PATIENT_METADATA.pop(pid, None)

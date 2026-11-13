@@ -525,6 +525,16 @@ def ensure_cuda_and_vlm_dependencies():
     except ImportError:
         to_install.append("qwen-vl-utils>=0.0.8")
 
+    try:
+        import neo4j
+    except ImportError:
+        to_install.append("neo4j>=5.18.0")
+
+    try:
+        import pydicom
+    except ImportError:
+        to_install.append("pydicom>=2.4.4")
+
     needs_reexec = False
     try:
         import torch
