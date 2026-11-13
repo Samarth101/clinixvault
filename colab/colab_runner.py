@@ -405,7 +405,34 @@ def start_colab_observability_bridge(watchdog: ColabGPUWatchdog):
         except Exception as le:
             print(f"{YELLOW}[{now_ist_str()}] ⚠️ Loki handshake note: {le}{RESET}")
 
-    # 2. Check and start Grafana Alloy Agent
+    # 2. Check Prometheus Remote Write endpoint
+    if prom_url and prom_user and api_token:
+        try:
+            import httpx
+            # Ensure URL ends in standard remote write push path
+            normalized_prom_url = prom_url.strip()
+            if not normalized_prom_url.endswith("/api/prom/push"):
+                normalized_prom_url = normalized_prom_url.rstrip("/") + "/api/prom/push"
+                os.environ["GRAFANA_CLOUD_PROMETHEUS_URL"] = normalized_prom_url
+
+            presp = httpx.post(
+                normalized_prom_url,
+                auth=(prom_user, api_token),
+                headers={"Content-Type": "application/x-protobuf"},
+                content=b"",
+                timeout=6.0,
+            )
+            # Status 200/204 or 400 (empty payload rejected by protobuf parser) confirms auth was accepted!
+            if presp.status_code in (200, 204, 400):
+                print(f"{GREEN}[{now_ist_str()}] 📡 [PROMETHEUS TELEMETRY] Grafana Cloud Prometheus endpoint authenticated successfully.{RESET}")
+            elif presp.status_code in (401, 403):
+                print(f"{RED}[{now_ist_str()}] ❌ [PROMETHEUS TELEMETRY] Auth failed (HTTP {presp.status_code}). Check GRAFANA_CLOUD_PROMETHEUS_USER ({prom_user}) and token scopes (requires metrics:write).{RESET}")
+            else:
+                print(f"{YELLOW}[{now_ist_str()}] ℹ️  Prometheus endpoint returned HTTP {presp.status_code}.{RESET}")
+        except Exception as pe:
+            print(f"{YELLOW}[{now_ist_str()}] ⚠️ Prometheus handshake probe note: {pe}{RESET}")
+
+    # 3. Check and start Grafana Alloy Agent
     alloy_bin = shutil.which("alloy") or shutil.which("grafana-alloy") or "/usr/local/bin/alloy"
     if not os.path.exists(alloy_bin):
         print(f"{BLUE}[{now_ist_str()}] 📦 Downloading Grafana Alloy Linux agent for automated metric ingestion...{RESET}")
@@ -435,7 +462,7 @@ def start_colab_observability_bridge(watchdog: ColabGPUWatchdog):
         alloy_log = Path("/tmp/clinixvault_alloy.log")
         try:
             alf = open(alloy_log, "a")
-            subprocess.Popen(
+            proc = subprocess.Popen(
                 [
                     alloy_bin,
                     "run",
@@ -447,8 +474,19 @@ def start_colab_observability_bridge(watchdog: ColabGPUWatchdog):
                 stdout=alf,
                 stderr=alf,
             )
-            print(f"{GREEN}{BOLD}[{now_ist_str()}] 📈 [GRAFANA CLOUD] Alloy agent actively scraping :8000/metrics and remote-writing to Prometheus!{RESET}")
-            print(f"{CYAN}   (Alloy background telemetry log streaming to {alloy_log}){RESET}")
+            time.sleep(1.5)
+            if proc.poll() is not None:
+                print(f"{RED}[{now_ist_str()}] ❌ Grafana Alloy daemon exited immediately with code {proc.returncode}.{RESET}")
+                if alloy_log.exists():
+                    try:
+                        with open(alloy_log) as lf:
+                            err_lines = lf.readlines()[-15:]
+                            print(f"{YELLOW}   Alloy error output:{RESET}\n{''.join(err_lines)}")
+                    except Exception:
+                        pass
+            else:
+                print(f"{GREEN}{BOLD}[{now_ist_str()}] 📈 [GRAFANA CLOUD] Alloy agent actively scraping :8000/metrics and remote-writing to Prometheus (PID {proc.pid})!{RESET}")
+                print(f"{CYAN}   (Alloy background telemetry log streaming to {alloy_log}){RESET}")
         except Exception as e:
             print(f"{YELLOW}[{now_ist_str()}] ⚠️ Alloy daemon launch warning: {e}{RESET}")
 

@@ -212,7 +212,18 @@ def analyze_chest_xray_pixels(
             lungs_pleura += " No evidence of pneumothorax."
 
     # Compartment 2: Cardiomediastinum
-    if is_marked_cardiomegaly:
+    if "lateral" in projection.lower():
+        if is_marked_cardiomegaly or has_cardiomegaly:
+            cardiomediastinum = (
+                "Cardiac silhouette demonstrates posterior cardiac enlargement on lateral projection. "
+                "Retrosternal clear space is reduced. Transverse cardiothoracic ratio (CTR) measurement deferred to frontal PA/AP projection."
+            )
+        else:
+            cardiomediastinum = (
+                "Normal cardiac silhouette and mediastinal contours on lateral projection. Retrosternal clear space is preserved. "
+                "Transverse cardiothoracic ratio (CTR) measurement deferred to frontal PA/AP projection."
+            )
+    elif is_marked_cardiomegaly:
         cardiomediastinum = (
             f"Moderate to marked cardiomegaly with measured cardiothoracic ratio of {ctr:.2f} (normal baseline <= 0.50). "
             "Cardiomediastinal silhouette is enlarged with ventricular prominence. Mediastinal contours and aortic arch are stable."
